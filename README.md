@@ -1,5 +1,9 @@
 # Mobile Robot — ROS 2
 
+![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
+![ROS 2](https://img.shields.io/badge/ROS%202-Kilted-blue)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+
 A differential drive mobile robot built with ROS 2, simulated in Gazebo
 with autonomous navigation using Nav2 and SLAM.
 
@@ -41,3 +45,8 @@ ros2 launch robot_description display.launch.py
 - [ ] Phase 4 — Custom interfaces and action server
 - [ ] Phase 5 — Full autonomous navigation with Nav2
 - [ ] Phase 6 — Tests
+
+## License
+
+This project is licensed under the Apache License 2.0 —
+see the [LICENSE](LICENSE) file for details.
