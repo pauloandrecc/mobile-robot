@@ -13,6 +13,7 @@ with autonomous navigation using Nav2 and SLAM.
 - src/
 - robot_description/   — URDF model, RViz config, display launch
 - robot_bringup/       — top-level launch files and config
+- maps/                — saved maps from SLAM sessions
 
 ## Requirements
 
@@ -21,6 +22,9 @@ with autonomous navigation using Nav2 and SLAM.
 - Xacro: `sudo apt install ros-kilted-xacro`
 - Joint state publisher GUI: `sudo apt install ros-kilted-joint-state-publisher-gui`
 - rqt graph: `sudo apt install ros-kilted-rqt-graph`
+- SLAM Toolbox: `sudo apt install ros-kilted-slam-toolbox`
+- Nav2: `sudo apt install ros-kilted-nav2-bringup`
+- Teleop: `sudo apt install ros-kilted-teleop-twist-keyboard`
 
 Or install all dependencies at once:
 
@@ -54,6 +58,24 @@ ros2 launch robot_bringup simulation.launch.py
 > **Important:** After Gazebo opens, click the **play button** in the
 > bottom-left corner to start the simulation clock. The robot will not
 > respond to commands until the simulation is running.
+
+### Run SLAM mapping
+
+```bash
+ros2 launch robot_bringup slam.launch.py
+```
+
+In a separate terminal, teleoperate the robot to explore the environment:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+After exploring, save the map:
+
+```bash
+ros2 run nav2_map_server map_saver_cli -f ~/mobile_robot/maps/my_map
+```
 
 ### Teleoperate the robot
 
@@ -94,7 +116,7 @@ ros2 run rqt_graph rqt_graph
 
 - [x] Phase 1 — Robot model (URDF, TF2, RViz)
 - [x] Phase 2 — Gazebo simulation (diff drive, Lidar, odometry)
-- [ ] Phase 3 — SLAM and mapping
+- [x] Phase 3 — SLAM mapping (slam_toolbox, map saving, bag recording)
 - [ ] Phase 4 — Custom interfaces and action server
 - [ ] Phase 5 — Full autonomous navigation with Nav2
 - [ ] Phase 6 — Tests
