@@ -20,7 +20,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
-
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, Command, PythonExpression
 
 def generate_launch_description():
 
@@ -29,8 +30,13 @@ def generate_launch_description():
 
     urdf_file = os.path.join(
         pkg_robot_description, 'urdf', 'robot.urdf.xacro')
-    world_file = os.path.join(
-        pkg_robot_description, 'worlds', 'empty_world.sdf')
+
+    world_name_arg = DeclareLaunchArgument(
+        'world_name',
+        default_value='obstacles_world',
+        description='Gazebo world name (used for joint state topic)'
+    )
+    world_name = LaunchConfiguration('world_name')
 
     # ── Launch arguments ──────────────────────────────────────────────
     use_rviz_arg = DeclareLaunchArgument(
@@ -59,12 +65,19 @@ def generate_launch_description():
         }]
     )
 
-    # Gazebo Harmonic with the empty world
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value=os.path.join(
+            pkg_robot_description, 'worlds', 'obstacles_world.sdf'),
+        description='Path to the Gazebo world file'
+    )
+    world = LaunchConfiguration('world')
+
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={'gz_args': world_file}.items()
+        launch_arguments={'gz_args': world}.items()
     )
 
     # Spawns the robot into the running Gazebo simulation
@@ -95,11 +108,15 @@ def generate_launch_description():
             '/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry',
             '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
-            '/world/empty_world/model/mobile_robot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
+            [
+                '/world/', world_name,
+                '/model/mobile_robot/joint_state'
+                '@sensor_msgs/msg/JointState[gz.msgs.Model'
+            ],
         ],
         remappings=[
             (
-                '/world/empty_world/model/mobile_robot/joint_state',
+                ['/world/', world_name, '/model/mobile_robot/joint_state'],
                 '/joint_states'
             ),
         ],
@@ -115,11 +132,14 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         arguments=['-d', rviz_config] if os.path.exists(rviz_config) else [],
-        parameters=[{'use_sim_time': True}]
+        parameters=[{'use_sim_time': True}],
+        condition=IfCondition(use_rviz)
     )
 
     return LaunchDescription([
         use_rviz_arg,
+        world_arg,
+        world_name_arg,
         robot_state_publisher,
         gazebo,
         spawn_robot,
