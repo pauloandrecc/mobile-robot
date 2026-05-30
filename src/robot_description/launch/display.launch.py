@@ -59,7 +59,7 @@ def generate_launch_description():
     )
 
     # RViz with default configuration
-    rviz_config = os.path.join(pkg_path, 'rviz', 'my_robot.rviz')
+    rviz_config = os.path.join(pkg_path, 'rviz', 'robot.rviz')
     rviz = Node(
         package='rviz2',
         executable='rviz2',
