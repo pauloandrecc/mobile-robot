@@ -27,7 +27,7 @@
     <mu2>0.01</mu2>
   </gazebo>
 
-  <!-- ── Differential drive plugin (Gazebo Harmonic syntax) ── -->
+  <!-- ── Differential drive plugin (Gazebo Jetty syntax) ── -->
   <gazebo>
     <plugin filename="gz-sim-diff-drive-system"
             name="gz::sim::systems::DiffDrive">
@@ -56,7 +56,7 @@
     </plugin>
   </gazebo>
 
-  <!-- ── Joint state publisher (Gazebo Harmonic syntax) ── -->
+  <!-- ── Joint state publisher (Gazebo Jetty syntax) ── -->
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system"
             name="gz::sim::systems::JointStatePublisher">

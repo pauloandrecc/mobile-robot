@@ -1,7 +1,7 @@
 # Mobile Robot — ROS 2
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![ROS 2](https://img.shields.io/badge/ROS%202-Kilted-blue)
+![ROS 2](https://img.shields.io/badge/ROS%202-Lyrical-blue)
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
 
 A differential drive mobile robot built with ROS 2, simulated in Gazebo
@@ -17,14 +17,14 @@ with autonomous navigation using Nav2 and SLAM.
 
 ## Requirements
 
-- ROS 2 Kilted
-- Gazebo Harmonic: `sudo apt install ros-kilted-ros-gz`
-- Xacro: `sudo apt install ros-kilted-xacro`
-- Joint state publisher GUI: `sudo apt install ros-kilted-joint-state-publisher-gui`
-- rqt graph: `sudo apt install ros-kilted-rqt-graph`
-- SLAM Toolbox: `sudo apt install ros-kilted-slam-toolbox`
-- Nav2: `sudo apt install ros-kilted-nav2-bringup`
-- Teleop: `sudo apt install ros-kilted-teleop-twist-keyboard`
+- ROS 2 Lyrical Luth (Ubuntu 26.04)
+- Gazebo Jetty: `sudo apt install ros-lyrical-ros-gz`
+- Xacro: `sudo apt install ros-lyrical-xacro`
+- Joint state publisher GUI: `sudo apt install ros-lyrical-joint-state-publisher-gui`
+- rqt graph: `sudo apt install ros-lyrical-rqt-graph`
+- SLAM Toolbox: `sudo apt install ros-lyrical-slam-toolbox`
+- Nav2: `sudo apt install ros-lyrical-nav2-bringup`
+- Teleop: `sudo apt install ros-lyrical-teleop-twist-keyboard`
 
 Or install all dependencies at once:
 
@@ -41,6 +41,10 @@ rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
+
+> **zsh users:** source the `.zsh` files instead (`source /opt/ros/lyrical/setup.zsh`
+> and `source install/setup.zsh`). Sourcing the `.bash` scripts from zsh fails
+> with `not found: ".../local_setup.bash"`.
 ## Usage
 
 ### Visualize the robot model (no simulation)
