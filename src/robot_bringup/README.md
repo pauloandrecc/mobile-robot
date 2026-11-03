@@ -62,7 +62,9 @@ Hold **LB** and use the left stick to drive; hold **RB** instead for turbo.
 ### slam.launch.py
 
 Launches the full simulation and starts SLAM mapping with slam_toolbox.
-Includes a lifecycle manager to activate the slam_toolbox node automatically.
+slam_toolbox is a lifecycle node: the launch file configures and activates
+it automatically (lifecycle events, same approach as slam_toolbox's own
+launch files), and opens RViz with `robot_description/rviz/slam.rviz`.
 
 ```bash
 ros2 launch robot_bringup slam.launch.py
@@ -73,6 +75,10 @@ Arguments:
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `use_sim_time` | `true` | Use simulation clock |
+| `use_rviz` | `true` | Launch RViz with the SLAM view |
+| `use_joystick` | `true` | Start gamepad teleoperation |
+| `world` | `obstacles_world.sdf` | Path to the Gazebo world file |
+| `world_name` | `obstacles_world` | World name (used for joint state topic bridge) |
 
 > **Important:** After launching, click the **play button** in Gazebo and
 > wait ~6 seconds before moving the robot. This gives the SLAM node time
@@ -109,12 +115,30 @@ map
 
 ## Known issues
 
-- Map quality degrades with sharp turns due to odometry drift — move
-  slowly and prefer gradual rotations for best results.
 - The slam_toolbox node must be started after the simulation clock is
   running — the 6-second delay in the launch file handles this automatically.
 - Lidar publishes at ~7.4 Hz instead of the configured 10 Hz due to
   simulation load — this slightly reduces SLAM update frequency but does
   not affect correctness.
-- Map quality will improve in Phase 5 when AMCL localization is added
-  on top of the saved map.
+- Maps recorded before the URDF fixes below are invalid and should be
+  re-recorded.
+
+## Fixed issues (Lyrical migration)
+
+- **Robot drove backwards / turned the wrong way:** the wheel joints were
+  rotated `+pi/2`, so their axis pointed to -Y and the diff drive plugin
+  spun them backwards while the odometry reported the opposite motion.
+  Fixed with `rpy="-pi/2 0 0"`.
+- **Phantom obstacles around the robot:** wheels and caster sank into the
+  ground, so the robot rested tilted ~2.3 deg and the Lidar beams hit the
+  floor 3-10 m away. `base_footprint` is now raised by
+  `wheel_radius - wheel_offset_z` and the caster touches the ground.
+- **Odometry under-estimated turns by ~18%:** cylinder wheel collisions
+  touched the ground at their inner edge (0.22 m track instead of 0.26 m).
+  Wheel collisions are now spheres.
+- **slam_toolbox never activated / lifecycle manager errors:** the Nav2
+  lifecycle manager could not bond with slam_toolbox, and enabling the bond
+  crashed slam_toolbox (`bad_weak_ptr`). The launch file now drives the
+  lifecycle transitions itself.
+- `loop_match_maximum_variance_covariance` (ignored typo) renamed to
+  `loop_match_maximum_variance_coarse`; `min_laser_range` set to 0.12 m.
