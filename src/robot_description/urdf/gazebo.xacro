@@ -98,4 +98,59 @@
     </sensor>
   </gazebo>
 
+  <!-- ── IMU sensor (needs gz-sim-imu-system in the world) ── -->
+  <gazebo reference="imu_link">
+    <sensor name="imu" type="imu">
+      <topic>/imu</topic>
+      <update_rate>100</update_rate>
+      <gz_frame_id>imu_link</gz_frame_id>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <imu>
+        <!-- Gaussian noise roughly matching a low-cost MEMS IMU -->
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <!-- ── Camera sensor (rendered by gz-sim-sensors-system) ── -->
+  <gazebo reference="camera_link">
+    <material>Gazebo/Black</material>
+    <sensor name="camera" type="camera">
+      <topic>/camera/image_raw</topic>
+      <update_rate>15</update_rate>
+      <!-- Images are expressed in the optical frame (z forward) -->
+      <gz_frame_id>camera_optical_link</gz_frame_id>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <camera>
+        <camera_info_topic>/camera/camera_info</camera_info_topic>
+        <horizontal_fov>1.047</horizontal_fov>  <!-- 60 deg -->
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>20.0</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+    </sensor>
+  </gazebo>
+
 </robot>

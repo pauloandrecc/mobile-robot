@@ -116,6 +116,9 @@ def generate_launch_description():
             '/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry',
             '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+            '/imu@sensor_msgs/msg/Imu[gz.msgs.IMU',
+            '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
             [
                 '/world/', world_name,
                 '/model/mobile_robot/joint_state'

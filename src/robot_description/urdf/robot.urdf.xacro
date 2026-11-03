@@ -19,6 +19,11 @@
   <xacro:property name="caster_radius"  value="0.025"/>
   <xacro:property name="caster_mass"    value="0.1"/>
 
+  <xacro:property name="camera_length"  value="0.02"/>
+  <xacro:property name="camera_width"   value="0.06"/>
+  <xacro:property name="camera_height"  value="0.03"/>
+  <xacro:property name="camera_mass"    value="0.05"/>
+
   <!-- Height of base_link above the ground: the wheel axles sit at
        wheel_offset_z below base_link and must be exactly wheel_radius above
        the ground, so wheels and caster touch the floor without sinking and
@@ -173,6 +178,59 @@
     <parent link="base_link"/>
     <child  link="lidar_link"/>
     <origin xyz="0 0 ${chassis_height/2 + 0.02}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU: at the center of the chassis, aligned with base_link -->
+  <link name="imu_link">
+    <visual>
+      <geometry><box size="0.02 0.02 0.01"/></geometry>
+      <material name="green"><color rgba="0.1 0.7 0.2 1"/></material>
+    </visual>
+    <xacro:inertia_box mass="0.01" l="0.02" w="0.02" h="0.01"/>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera: on the front face of the chassis, below the Lidar scan plane
+       so the Lidar doesn't see it as an obstacle -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="${camera_length} ${camera_width} ${camera_height}"/>
+      </geometry>
+      <material name="black"><color rgba="0.05 0.05 0.05 1"/></material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${camera_length} ${camera_width} ${camera_height}"/>
+      </geometry>
+    </collision>
+    <xacro:inertia_box
+      mass="${camera_mass}"
+      l="${camera_length}"
+      w="${camera_width}"
+      h="${camera_height}"/>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="camera_link"/>
+    <origin xyz="${chassis_length/2 + camera_length/2} 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Optical frame (REP 103): z forward, x right, y down. Image messages
+       are expressed in this frame, while camera_link keeps the robot
+       convention (x forward, y left, z up). -->
+  <link name="camera_optical_link"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child  link="camera_optical_link"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
   </joint>
 
   <!-- Gazebo plugins and material properties -->
