@@ -124,9 +124,21 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
 # List all active topics
 ros2 topic list
 
-# Check publishing rates
+# Check publishing rates (expected: /scan ~10 Hz, /imu 100 Hz,
+# /odom 20 Hz, /camera/image_raw ~13-15 Hz)
 ros2 topic hz /scan
+ros2 topic hz /imu
 ros2 topic hz /odom
+ros2 topic hz /camera/image_raw
+
+# Inspect topics, rates and message contents in a GUI
+ros2 run rqt_topic rqt_topic
+
+# See the camera image
+ros2 run rqt_image_view rqt_image_view /camera/image_raw
+
+# Plot the IMU gyroscope while turning the robot
+ros2 run rqt_plot rqt_plot /imu/angular_velocity/z
 
 # View the TF tree
 ros2 run tf2_tools view_frames
@@ -138,7 +150,7 @@ ros2 run rqt_graph rqt_graph
 ## Phases
 
 - [x] Phase 1 — Robot model (URDF, TF2, RViz)
-- [x] Phase 2 — Gazebo simulation (diff drive, Lidar, odometry)
+- [x] Phase 2 — Gazebo simulation (diff drive, Lidar, IMU, camera, odometry)
 - [x] Phase 3 — SLAM mapping (slam_toolbox, map saving, bag recording)
 - [ ] Phase 4 — Custom interfaces and action server
 - [ ] Phase 5 — Full autonomous navigation with Nav2

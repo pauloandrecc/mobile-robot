@@ -26,13 +26,17 @@ Robotics: links/joints, inertia tensor, TF tree derived from the URDF.
 Package names differ from the plan: `robot_description`, `robot_bringup`
 (plan: `my_robot_description`, `my_robot_bringup`).
 
-### Phase 2 — Gazebo simulation 🟡
+### Phase 2 — Gazebo simulation ✅
 Topics: Gazebo, plugins, TF2, topics, nodes, rqt.
 Done: world SDF, diff drive plugin (`/cmd_vel` → `/odom`), 2D Lidar (`/scan`),
-joint state publisher, `ros_gz_bridge`, `simulation.launch.py`, teleop
-(keyboard and gamepad via `joy` + `teleop_twist_joy`).
-Missing from the plan: **IMU sensor** (and the camera mentioned in the project
-overview). Validation with `rqt_graph` / `rqt_topic` / `ros2 topic hz /scan`.
+IMU (`/imu`, needs `gz-sim-imu-system` in the world), camera
+(`/camera/image_raw`, `/camera/camera_info`, optical frame
+`camera_optical_link`), joint state publisher, `ros_gz_bridge`,
+`simulation.launch.py`, teleop (keyboard and gamepad via `joy` +
+`teleop_twist_joy`). Validation commands (`ros2 topic hz`, `rqt_graph`,
+`rqt_topic`, `rqt_image_view`, `rqt_plot`) documented in the README.
+Measured rates (headless, RTF ~1.0): scan ~10 Hz, imu 100 Hz, odom 20 Hz,
+camera ~13 Hz.
 
 ### Phase 3 — SLAM and mapping 🟡
 Topics: slam_toolbox, TF2 (map→odom→base_link), bag, parameters,
