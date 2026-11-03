@@ -81,7 +81,26 @@ After exploring, save the map:
 ros2 run nav2_map_server map_saver_cli -f ~/mobile_robot/maps/my_map
 ```
 
-### Teleoperate the robot
+### Teleoperate with a gamepad
+
+The simulation (and SLAM) launch starts gamepad teleoperation by default
+(`joy` + `teleop_twist_joy`). Tested with a GameSir Nova Lite and its
+2.4 GHz receiver (seen by Linux as "Zikway HID gamepad"). The controller is
+read through SDL's GameController mapping, so any controller SDL knows
+(Xbox, PlayStation, ...) uses the same buttons.
+
+| Control | Action |
+|---------|--------|
+| Hold **LB** | Enable driving (release to stop) |
+| Hold **RB** | Enable driving in turbo mode |
+| Left stick ↑/↓ | Forward / backward (0.3 m/s, turbo 0.6 m/s) |
+| Left stick ←/→ | Turn (1.0 rad/s, turbo 1.5 rad/s) |
+
+Mappings and speeds live in `src/robot_bringup/config/joystick.yaml`.
+To disable it: `ros2 launch robot_bringup simulation.launch.py use_joystick:=false`.
+To check the controller indices: `ros2 topic echo /joy`.
+
+### Teleoperate the robot from the terminal
 
 In a separate terminal after launching the simulation:
 

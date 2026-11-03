@@ -26,6 +26,7 @@ from launch.substitutions import LaunchConfiguration, Command, PythonExpression
 def generate_launch_description():
 
     pkg_robot_description = get_package_share_directory('robot_description')
+    pkg_robot_bringup = get_package_share_directory('robot_bringup')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
 
     urdf_file = os.path.join(
@@ -45,6 +46,13 @@ def generate_launch_description():
         description='Launch RViz alongside Gazebo'
     )
     use_rviz = LaunchConfiguration('use_rviz')
+
+    use_joystick_arg = DeclareLaunchArgument(
+        'use_joystick',
+        default_value='true',
+        description='Teleoperate the robot with a gamepad (joy + teleop_twist_joy)'
+    )
+    use_joystick = LaunchConfiguration('use_joystick')
 
     # ── Robot description (processed from Xacro) ──────────────────────
     robot_description = ParameterValue(
@@ -136,8 +144,17 @@ def generate_launch_description():
         condition=IfCondition(use_rviz)
     )
 
+    # Gamepad teleoperation: /joy → /cmd_vel
+    joystick = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_robot_bringup, 'launch', 'joystick.launch.py')
+        ),
+        condition=IfCondition(use_joystick)
+    )
+
     return LaunchDescription([
         use_rviz_arg,
+        use_joystick_arg,
         world_arg,
         world_name_arg,
         robot_state_publisher,
@@ -145,4 +162,5 @@ def generate_launch_description():
         spawn_robot,
         gz_bridge,
         rviz,
+        joystick,
     ])
