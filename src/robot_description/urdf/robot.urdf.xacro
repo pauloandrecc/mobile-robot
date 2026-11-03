@@ -19,6 +19,12 @@
   <xacro:property name="caster_radius"  value="0.025"/>
   <xacro:property name="caster_mass"    value="0.1"/>
 
+  <!-- Height of base_link above the ground: the wheel axles sit at
+       wheel_offset_z below base_link and must be exactly wheel_radius above
+       the ground, so wheels and caster touch the floor without sinking and
+       the chassis (and the Lidar) stays level. -->
+  <xacro:property name="base_height"    value="${wheel_radius - wheel_offset_z}"/>
+
   <!-- ── Macro: Box inertia ── -->
   <xacro:macro name="inertia_box" params="mass l w h">
     <inertial>
@@ -54,9 +60,14 @@
           <color rgba="0.2 0.2 0.2 1"/>
         </material>
       </visual>
+      <!-- Collision is a sphere, not a cylinder: a cylinder touches the
+           ground at its edges, so the effective wheel separation in the
+           physics differs from the one used by the diff drive plugin and
+           the odometry drifts when turning. A sphere touches the ground at
+           a single point in the middle of the wheel. -->
       <collision>
         <geometry>
-          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+          <sphere radius="${wheel_radius}"/>
         </geometry>
       </collision>
       <xacro:inertia_cylinder
@@ -108,8 +119,8 @@
   <joint name="base_footprint_joint" type="fixed">
     <parent link="base_footprint"/>
     <child  link="base_link"/>
-    <!-- the chassis is raised by the wheel radius. -->
-    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+    <!-- the chassis is raised so the wheels rest on the ground -->
+    <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
   </joint>
 
   <!-- Drive wheels (reused macro) -->
@@ -135,8 +146,10 @@
   <joint name="caster_joint" type="fixed">
     <parent link="base_link"/>
     <child  link="caster_wheel"/>
+    <!-- caster center is caster_radius above the ground, so it touches the
+         floor at the same height as the drive wheels -->
     <origin xyz="${chassis_length/2 - caster_radius} 0
-                 ${-chassis_height/2}"
+                 ${caster_radius - base_height}"
             rpy="0 0 0"/>
   </joint>
 

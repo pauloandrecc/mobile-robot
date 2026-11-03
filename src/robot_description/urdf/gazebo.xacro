@@ -76,8 +76,10 @@
           <horizontal>
             <samples>360</samples>
             <resolution>1</resolution>
+            <!-- 360 samples, 1 deg apart: max = pi - 2*pi/360, so the first
+                 and last rays don't overlap at +/-180 deg -->
             <min_angle>-3.14159</min_angle>
-            <max_angle>3.14159</max_angle>
+            <max_angle>3.12414</max_angle>
           </horizontal>
         </scan>
         <range>
