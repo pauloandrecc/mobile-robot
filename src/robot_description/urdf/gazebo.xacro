@@ -41,18 +41,8 @@
       <frame_id>odom</frame_id>
       <child_frame_id>base_footprint</child_frame_id>
       <odom_publish_frequency>20</odom_publish_frequency>
-
-      <!-- Realistic covariance values for a differential drive robot -->
-      <!-- Pose covariance: [x, y, z, roll, pitch, yaw] diagonal -->
-      <covariance_x>0.001</covariance_x>
-      <covariance_y>0.001</covariance_y>
-      <covariance_yaw>0.001</covariance_yaw>
-
-      <!-- Velocity covariance -->
-      <covariance_vx>0.001</covariance_vx>
-      <covariance_vy>0.001</covariance_vy>
-      <covariance_vyaw>0.001</covariance_vyaw>
-
+      <!-- Note: the gz-sim DiffDrive system has no covariance parameters;
+           /odom is published with all-zero covariance matrices. -->
     </plugin>
   </gazebo>
 
