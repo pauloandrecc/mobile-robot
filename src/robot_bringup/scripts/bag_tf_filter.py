@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Forward only selected transforms from a replayed bag to /tf.
+"""
+Forward only selected transforms from a replayed bag to /tf.
 
 A bag recorded during a SLAM session contains, in /tf, transforms from three
 different sources:

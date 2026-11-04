@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Rebuild a map with slam_toolbox from a bag recorded by slam.launch.py.
+"""
+Rebuild a map with slam_toolbox from a bag recorded by slam.launch.py.
 
 No Gazebo: the bag provides the Lidar scans, the odometry and the clock.
 

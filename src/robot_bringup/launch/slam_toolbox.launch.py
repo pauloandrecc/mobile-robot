@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Start slam_toolbox (synchronous mapping) and bring it to the active state.
+"""
+Start slam_toolbox (synchronous mapping) and bring it to the active state.
 
 Shared by slam.launch.py (live mapping in Gazebo) and slam_replay.launch.py
 (mapping from a recorded bag).
