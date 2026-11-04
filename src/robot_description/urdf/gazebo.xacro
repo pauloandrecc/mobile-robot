@@ -62,6 +62,8 @@
             name="gz::sim::systems::JointStatePublisher">
       <joint_name>left_wheel_joint</joint_name>
       <joint_name>right_wheel_joint</joint_name>
+      <!-- Without a rate it publishes on every physics step (1 kHz) -->
+      <update_rate>50</update_rate>
     </plugin>
   </gazebo>
 
