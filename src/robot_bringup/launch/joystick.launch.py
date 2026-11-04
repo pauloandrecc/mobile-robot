@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import os
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
@@ -40,31 +42,44 @@ def generate_launch_description():
     )
     joy_dev = LaunchConfiguration('joy_dev')
 
-    # ── Nodes ─────────────────────────────────────────────────────────
-
-    # Reads the gamepad and publishes sensor_msgs/Joy on /joy, using SDL's
-    # GameController mapping so button/axis indices are the same for any
-    # supported controller (see config/joystick.yaml for the layout)
-    joy_node = Node(
-        package='joy',
-        executable='game_controller_node',
-        name='game_controller_node',
-        parameters=[joy_config, {'device_id': joy_dev}],
-        output='screen'
-    )
-
-    # Converts /joy into geometry_msgs/Twist on /cmd_vel
-    teleop_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_twist_joy_node',
-        parameters=[joy_config],
+    # ── Composable nodes ──────────────────────────────────────────────
+    # Both nodes are loaded as components into a single process (the
+    # container) instead of running as two separate processes. With
+    # intra-process communication enabled, /joy messages are passed by
+    # pointer inside the process, without serialization through DDS.
+    # They are still normal ROS 2 nodes: /joy and /cmd_vel are visible to
+    # the rest of the system (ros2 topic echo, rqt_graph, ...).
+    #   ros2 component list   → shows the container and its components
+    gamepad_container = ComposableNodeContainer(
+        name='gamepad_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=[
+            # Reads the gamepad and publishes sensor_msgs/Joy on /joy, using
+            # SDL's GameController mapping so button/axis indices are the
+            # same for any supported controller (see config/joystick.yaml)
+            ComposableNode(
+                package='joy',
+                plugin='joy::GameController',
+                name='game_controller_node',
+                parameters=[joy_config, {'device_id': joy_dev}],
+                extra_arguments=[{'use_intra_process_comms': True}],
+            ),
+            # Converts /joy into geometry_msgs/Twist on /cmd_vel
+            ComposableNode(
+                package='teleop_twist_joy',
+                plugin='teleop_twist_joy::TeleopTwistJoy',
+                name='teleop_twist_joy_node',
+                parameters=[joy_config],
+                extra_arguments=[{'use_intra_process_comms': True}],
+            ),
+        ],
         output='screen'
     )
 
     return LaunchDescription([
         joy_config_arg,
         joy_dev_arg,
-        joy_node,
-        teleop_node,
+        gamepad_container,
     ])
