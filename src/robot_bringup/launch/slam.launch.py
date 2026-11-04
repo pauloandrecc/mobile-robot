@@ -12,29 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 import os
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, EmitEvent, GroupAction,
-                            IncludeLaunchDescription, LogInfo,
-                            RegisterEventHandler, TimerAction)
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
+                            GroupAction, IncludeLaunchDescription,
+                            TimerAction)
 from launch.conditions import IfCondition
-from launch.events import matches_action
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import LifecycleNode, Node
-from launch_ros.event_handlers import OnStateTransition
-from launch_ros.events.lifecycle import ChangeState
-from lifecycle_msgs.msg import Transition
+from launch_ros.actions import Node
+
+# Topics recorded with record:=true. Enough to rebuild the map offline with
+# slam_replay.launch.py: Lidar, odometry (/odom and odom→base_footprint in
+# /tf), joint states, plus IMU and velocity commands for later analysis.
+# /clock is not recorded: the bag is stamped with simulation time
+# (--use-sim-time) and slam_replay.launch.py republishes the clock from it.
+RECORDED_TOPICS = [
+    '/scan', '/odom', '/tf', '/tf_static', '/joint_states', '/imu',
+    '/cmd_vel',
+]
 
 
 def generate_launch_description():
 
     pkg_robot_bringup = get_package_share_directory('robot_bringup')
     pkg_robot_description = get_package_share_directory('robot_description')
-
-    slam_params_file = os.path.join(
-        pkg_robot_bringup, 'config', 'slam_toolbox_params.yaml')
 
     # ── Launch arguments ──────────────────────────────────────────────
     use_sim_time_arg = DeclareLaunchArgument(
@@ -48,6 +53,18 @@ def generate_launch_description():
         'use_rviz',
         default_value='true',
         description='Launch RViz with the SLAM view'
+    )
+
+    record_arg = DeclareLaunchArgument(
+        'record',
+        default_value='false',
+        description='Record the mapping session to a bag (MCAP)'
+    )
+    bag_arg = DeclareLaunchArgument(
+        'bag',
+        default_value=os.path.join(
+            'bags', 'mapping_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S')),
+        description='Output folder of the bag (relative to the current dir)'
     )
 
     # Forwarded to simulation.launch.py
@@ -73,65 +90,45 @@ def generate_launch_description():
     # Wrapped in a scoped GroupAction: arguments passed to an include leak
     # into this file otherwise (use_rviz:=false would also disable the RViz
     # started below).
-    simulation_include = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                pkg_robot_bringup, 'launch', 'simulation.launch.py')
-        ),
-        launch_arguments={
-            'use_rviz': 'false',  # RViz with the SLAM config is started below
-            'world': LaunchConfiguration('world'),
-            'world_name': LaunchConfiguration('world_name'),
-            'use_joystick': LaunchConfiguration('use_joystick'),
-        }.items()
-    )
-    simulation = GroupAction([simulation_include], scoped=True)
-
-    # ── slam_toolbox node ─────────────────────────────────────────────
-    # Synchronous mapping: subscribes to /scan and /tf,
-    # publishes /map and the map→odom transform.
-    # slam_toolbox is a lifecycle node: it starts "unconfigured" and must be
-    # configured and then activated before it does anything.
-    slam_toolbox = LifecycleNode(
-        package='slam_toolbox',
-        executable='sync_slam_toolbox_node',
-        name='slam_toolbox',
-        namespace='',
-        parameters=[
-            slam_params_file,
-            {'use_sim_time': use_sim_time}
-        ],
-        output='screen'
-    )
-
-    # Step 1: unconfigured → inactive
-    configure_slam = EmitEvent(
-        event=ChangeState(
-            lifecycle_node_matcher=matches_action(slam_toolbox),
-            transition_id=Transition.TRANSITION_CONFIGURE
+    simulation = GroupAction([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(
+                    pkg_robot_bringup, 'launch', 'simulation.launch.py')
+            ),
+            launch_arguments={
+                'use_rviz': 'false',  # RViz with the SLAM config is below
+                'world': LaunchConfiguration('world'),
+                'world_name': LaunchConfiguration('world_name'),
+                'use_joystick': LaunchConfiguration('use_joystick'),
+            }.items()
         )
-    )
+    ], scoped=True)
 
-    # Step 2: as soon as it is inactive → active
-    activate_slam = RegisterEventHandler(
-        OnStateTransition(
-            target_lifecycle_node=slam_toolbox,
-            start_state='configuring',
-            goal_state='inactive',
-            entities=[
-                LogInfo(msg='[slam.launch] Activating slam_toolbox'),
-                EmitEvent(event=ChangeState(
-                    lifecycle_node_matcher=matches_action(slam_toolbox),
-                    transition_id=Transition.TRANSITION_ACTIVATE
-                ))
-            ]
-        )
-    )
-
-    # Give Gazebo and the bridge a few seconds to come up first
-    start_slam = TimerAction(
+    # ── slam_toolbox ──────────────────────────────────────────────────
+    # Configured and activated by slam_toolbox.launch.py.
+    # Give Gazebo and the bridge a few seconds to come up first.
+    slam_toolbox = TimerAction(
         period=5.0,
-        actions=[activate_slam, slam_toolbox, configure_slam]
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        pkg_robot_bringup, 'launch', 'slam_toolbox.launch.py')
+                ),
+                launch_arguments={'use_sim_time': use_sim_time}.items()
+            )
+        ]
+    )
+
+    # ── Bag recording (record:=true) ──────────────────────────────────
+    record_bag = ExecuteProcess(
+        cmd=['ros2', 'bag', 'record', '--use-sim-time',
+             '--storage', 'mcap',
+             '--output', LaunchConfiguration('bag'),
+             '--topics'] + RECORDED_TOPICS,
+        condition=IfCondition(LaunchConfiguration('record')),
+        output='screen'
     )
 
     # ── RViz with SLAM-specific config ────────────────────────────────
@@ -150,10 +147,13 @@ def generate_launch_description():
     return LaunchDescription([
         use_sim_time_arg,
         use_rviz_arg,
+        record_arg,
+        bag_arg,
         world_arg,
         world_name_arg,
         use_joystick_arg,
         simulation,
-        start_slam,
+        slam_toolbox,
+        record_bag,
         rviz,
     ])

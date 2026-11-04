@@ -26,4 +26,10 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Python nodes (run with: ros2 run robot_bringup <script>.py)
+install(PROGRAMS
+  scripts/bag_tf_filter.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

@@ -3,6 +3,9 @@ build/
 install/
 log/
 
+# Recorded bags (ros2 bag record)
+bags/
+
 # Python
 __pycache__/
 *.pyc
