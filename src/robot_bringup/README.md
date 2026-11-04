@@ -7,9 +7,13 @@ This package orchestrates all other packages — simulation, SLAM, and navigatio
 
 - robot_bringup/
 - launch/
-- simulation.launch.py      — Gazebo simulation with diff drive and Lidar
-- slam.launch.py            — SLAM mapping with slam_toolbox
-- joystick.launch.py        — gamepad teleoperation (joy + teleop_twist_joy)
+- simulation.launch.py      — Gazebo simulation with diff drive and sensors
+- slam.launch.py            — SLAM mapping with slam_toolbox (+ bag recording)
+- slam_replay.launch.py     — rebuild a map from a recorded bag, no Gazebo
+- slam_toolbox.launch.py    — starts and activates slam_toolbox (shared)
+- joystick.launch.py        — gamepad teleoperation (composable nodes)
+- scripts/
+- bag_tf_filter.py          — forwards only odom→base_footprint from a bag's /tf
 - config/
 - slam_toolbox_params.yaml  — slam_toolbox tuning parameters
 - joystick.yaml             — gamepad button/axis mapping and speeds
@@ -48,6 +52,11 @@ standard controller layout, publishes `/joy`) and
 `teleop_twist_joy` (converts `/joy` into `/cmd_vel`). Included automatically
 by `simulation.launch.py`; it can also be run on its own:
 
+Both are loaded as **composable nodes** (components) into a single process,
+`gamepad_container`, with intra-process communication: `/joy` messages are
+passed by pointer instead of being serialized through DDS. Inspect it with
+`ros2 component list`.
+
 ```bash
 ros2 launch robot_bringup joystick.launch.py
 ```
@@ -79,10 +88,39 @@ Arguments:
 | `use_joystick` | `true` | Start gamepad teleoperation |
 | `world` | `obstacles_world.sdf` | Path to the Gazebo world file |
 | `world_name` | `obstacles_world` | World name (used for joint state topic bridge) |
+| `record` | `false` | Record the session to a bag (MCAP) |
+| `bag` | `bags/mapping_<date>` | Output folder of the bag, relative to the current directory |
+
+With `record:=true` the topics `/scan /odom /tf /tf_static /joint_states
+/imu /cmd_vel` are recorded with simulation timestamps (`--use-sim-time`).
 
 > **Important:** After launching, click the **play button** in Gazebo and
 > wait ~6 seconds before moving the robot. This gives the SLAM node time
 > to initialize and all TF frames time to stabilize.
+
+### slam_replay.launch.py
+
+Rebuilds a map with slam_toolbox from a bag recorded by `slam.launch.py`,
+**without Gazebo**: the bag provides the Lidar scans, the odometry and the
+clock.
+
+```bash
+ros2 launch robot_bringup slam_replay.launch.py bag:=bags/mapping_<date>
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `bag` | — (required) | Bag folder to replay |
+| `rate` | `1.0` | Playback speed |
+| `use_rviz` | `true` | Launch RViz with the SLAM view |
+
+How it works: the recorded `/tf` contains `odom→base_footprint` (wanted),
+the wheel transforms and the **old SLAM's `map→odom`**, which would fight the
+new SLAM. The bag is played with `/tf` remapped to `/tf_bag`, and
+`bag_tf_filter.py` forwards only `odom→base_footprint` to `/tf`.
+`robot_state_publisher` republishes the robot frames and the new
+slam_toolbox publishes `map→odom`. `/clock` comes from the bag
+(`ros2 bag play --clock`).
 
 ## SLAM workflow
 
@@ -91,7 +129,11 @@ Arguments:
 3. Teleoperate: hold **LB** on the gamepad and use the left stick
    (or `ros2 run teleop_twist_keyboard teleop_twist_keyboard`)
 4. Explore the environment slowly — prefer straight lines over sharp turns
-5. Save the map: `ros2 run nav2_map_server map_saver_cli -f ~/mobile_robot/maps/my_map`
+5. Save the map (from the repository root):
+   `ros2 run nav2_map_server map_saver_cli -f maps/my_map`
+
+To debug offline, record the session with `record:=true` and replay it
+later with `slam_replay.launch.py`.
 
 ## ROS 2 topics
 

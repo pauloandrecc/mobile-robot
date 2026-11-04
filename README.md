@@ -75,10 +75,23 @@ In a separate terminal, teleoperate the robot to explore the environment:
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-After exploring, save the map:
+After exploring, save the map (from the repository root):
 
 ```bash
-ros2 run nav2_map_server map_saver_cli -f ~/mobile_robot/maps/my_map
+ros2 run nav2_map_server map_saver_cli -f maps/my_map
+```
+
+### Record a mapping session and replay it without Gazebo
+
+```bash
+# Record /scan, /odom, /tf, /imu, ... to bags/mapping_<date> (MCAP)
+ros2 launch robot_bringup slam.launch.py record:=true
+
+# Inspect the bag
+ros2 bag info bags/mapping_<date>
+
+# Rebuild the map from the bag only — no Gazebo running
+ros2 launch robot_bringup slam_replay.launch.py bag:=bags/mapping_<date>
 ```
 
 ### Teleoperate with a gamepad

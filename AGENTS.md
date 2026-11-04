@@ -38,14 +38,17 @@ IMU (`/imu`, needs `gz-sim-imu-system` in the world), camera
 Measured rates (headless, RTF ~1.0): scan ~10 Hz, imu 100 Hz, odom 20 Hz,
 camera ~13 Hz.
 
-### Phase 3 — SLAM and mapping 🟡
+### Phase 3 — SLAM and mapping ✅
 Topics: slam_toolbox, TF2 (map→odom→base_link), bag, parameters,
 launch (composable nodes).
 Done: `slam.launch.py` + `slam_toolbox_params.yaml`, live map in RViz
-(`rviz/slam.rviz`), map saving with `map_saver_cli`.
-Missing: **record a full mapping bag** (`ros2 bag record`) and **replay it
-without Gazebo** to rebuild the map from recorded data; composable nodes.
-The map in `maps/` was recorded before the URDF/SLAM fixes and must be redone.
+(`rviz/slam.rviz`), map saving with `map_saver_cli`, bag recording
+(`slam.launch.py record:=true`, MCAP, sim time), offline replay without
+Gazebo (`slam_replay.launch.py` + `scripts/bag_tf_filter.py`, which keeps the
+recorded map→odom out of /tf), composable nodes (gamepad container in
+`joystick.launch.py`). slam_toolbox startup is shared in
+`slam_toolbox.launch.py`. Replayed map matched the live one in 99.5% of
+cells.
 Robotics: probabilistic occupancy grid, loop closure, why `map→odom` is
 separate from `odom→base_link`.
 
