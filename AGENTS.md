@@ -130,6 +130,14 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
   are spheres (cylinders contact at the inner edge and break odometry), and
   `base_height` keeps wheels and caster exactly on the ground (otherwise the
   robot tilts and the Lidar sees the floor).
+- The gz-sim `DiffDrive` system has no covariance parameters: `/odom` is
+  published with all-zero covariance ("infinite confidence"). Before fusing
+  odometry with the IMU (e.g. `robot_localization` in Phase 5), add realistic
+  covariances (for example with a small relay node).
+- World materials need `<diffuse>` (not only `<ambient>`): the ogre2 PBR
+  renderer uses mostly diffuse, so ambient-only objects render black.
+- `colcon test` runs `ament_lint_common` (flake8, pep257, xmllint,
+  lint_cmake); keep it at 0 failures.
 
 ## Verifying changes without a GUI
 

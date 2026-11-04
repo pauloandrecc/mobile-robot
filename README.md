@@ -9,11 +9,15 @@ with autonomous navigation using Nav2 and SLAM.
 
 ## Project structure
 
-- mobile_robot/
-- src/
-- robot_description/   — URDF model, RViz config, display launch
-- robot_bringup/       — top-level launch files and config
-- maps/                — saved maps from SLAM sessions
+```
+mobile-robot/
+├── src/
+│   ├── robot_description/   — URDF model (Lidar, IMU, camera), worlds, RViz configs
+│   └── robot_bringup/       — top-level launch files, config, helper nodes
+├── maps/                    — saved maps from SLAM sessions
+├── bags/                    — recorded bags (not versioned)
+└── AGENTS.md                — roadmap, phase status and conventions
+```
 
 ## Requirements
 
@@ -25,18 +29,19 @@ with autonomous navigation using Nav2 and SLAM.
 - SLAM Toolbox: `sudo apt install ros-lyrical-slam-toolbox`
 - Nav2: `sudo apt install ros-lyrical-nav2-bringup`
 - Teleop: `sudo apt install ros-lyrical-teleop-twist-keyboard`
+- Gamepad: `sudo apt install ros-lyrical-joy ros-lyrical-teleop-twist-joy`
 
-Or install all dependencies at once:
+Or install all dependencies at once (from the repository root):
 
 ```bash
-cd ~/mobile_robot
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
 ## Build
 
 ```bash
-cd ~/mobile_robot
+git clone https://github.com/pauloandrecc/mobile-robot.git
+cd mobile-robot
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
@@ -45,6 +50,7 @@ source install/setup.bash
 > **zsh users:** source the `.zsh` files instead (`source /opt/ros/lyrical/setup.zsh`
 > and `source install/setup.zsh`). Sourcing the `.bash` scripts from zsh fails
 > with `not found: ".../local_setup.bash"`.
+
 ## Usage
 
 ### Visualize the robot model (no simulation)
