@@ -6,6 +6,10 @@ log/
 # Recorded bags (ros2 bag record)
 bags/
 
+# TF tree snapshots (ros2 run tf2_tools view_frames)
+frames_*.gv
+frames_*.pdf
+
 # Python
 __pycache__/
 *.pyc
