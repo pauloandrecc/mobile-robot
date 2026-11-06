@@ -12,11 +12,13 @@ This package orchestrates all other packages — simulation, SLAM, and navigatio
 - slam_replay.launch.py     — rebuild a map from a recorded bag, no Gazebo
 - slam_toolbox.launch.py    — starts and activates slam_toolbox (shared)
 - joystick.launch.py        — gamepad teleoperation (composable nodes)
+- navigation.launch.py      — SLAM + minimal Nav2 + waypoint action server
 - scripts/
 - bag_tf_filter.py          — forwards only odom→base_footprint from a bag's /tf
 - config/
 - slam_toolbox_params.yaml  — slam_toolbox tuning parameters
 - joystick.yaml             — gamepad button/axis mapping and speeds
+- nav2_params.yaml          — minimal Nav2 config (DWB + rotation shim)
 
 ## Launch files
 
@@ -121,6 +123,39 @@ new SLAM. The bag is played with `/tf` remapped to `/tf_bag`, and
 `robot_state_publisher` republishes the robot frames and the new
 slam_toolbox publishes `map→odom`. `/clock` comes from the bag
 (`ros2 bag play --clock`).
+
+### navigation.launch.py
+
+Includes `slam.launch.py` (Gazebo + slam_toolbox), then after 8 s starts the
+Nav2 servers used by the default NavigateToPose behavior tree
+(`controller_server`, `planner_server`, `behavior_server`, `bt_navigator`),
+a `nav2_lifecycle_manager` that configures/activates them, and
+`robot_navigation`'s `waypoint_action_server`.
+
+```bash
+ros2 launch robot_bringup navigation.launch.py
+ros2 run robot_navigation navigation_client 2.5,0 3.2,2.0,90 0,0,180
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `use_sim_time` | `true` | Use simulation clock |
+| `use_rviz` | `true` | Launch RViz with the SLAM view |
+| `use_joystick` | `true` | Start gamepad teleoperation |
+| `world` | `obstacles_world.sdf` | Path to the Gazebo world file |
+| `nav2_params` | `config/nav2_params.yaml` | Nav2 parameters file |
+| `max_speed` | `0.3` | Initial speed limit of the waypoint server (m/s) |
+
+Notes on `nav2_params.yaml`:
+
+- `enable_stamped_cmd_vel: false` — Nav2 1.5 publishes `TwistStamped` by
+  default, but the Gazebo bridge expects `Twist` on `/cmd_vel`.
+- The controller is DWB wrapped in `RotationShimController`, which turns in
+  place towards the path first (DWB alone stalls when the next waypoint is
+  behind the robot). Since Nav2 Kilted, DWB's parameters live under
+  `FollowPath.primary_controller`.
+- `speed_limit_topic: /speed_limit` — the waypoint server publishes
+  `nav2_msgs/SpeedLimit` there to cap the controller's speed at runtime.
 
 ## SLAM workflow
 

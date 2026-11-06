@@ -6,7 +6,7 @@
 <package format="3">
   <name>robot_bringup</name>
   <version>0.0.0</version>
-  <description>Top-level launch files and configuration for the mobile robot: Gazebo simulation, gamepad teleoperation, SLAM mapping and bag replay.</description>
+  <description>Top-level launch files and configuration for the mobile robot: Gazebo simulation, gamepad teleoperation, SLAM mapping, bag replay and Nav2 navigation.</description>
   <maintainer email="paulocarvalho@poli.ufrj.br">Paulo</maintainer>
   <license>Apache-2.0</license>
 
@@ -23,6 +23,18 @@
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>nav2_behaviors</exec_depend>
+  <exec_depend>nav2_bt_navigator</exec_depend>
+  <exec_depend>nav2_navfn_planner</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
+  <exec_depend>nav2_rotation_shim_controller</exec_depend>
+  <exec_depend>dwb_core</exec_depend>
+  <exec_depend>dwb_plugins</exec_depend>
+  <exec_depend>dwb_critics</exec_depend>
+  <exec_depend>robot_navigation</exec_depend>
   <exec_depend>teleop_twist_keyboard</exec_depend>
   <exec_depend>joy</exec_depend>
   <exec_depend>teleop_twist_joy</exec_depend>

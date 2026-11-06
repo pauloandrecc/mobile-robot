@@ -1,0 +1,7 @@
+# Change the maximum linear speed of the waypoint navigation at runtime.
+
+# New limit in m/s (must be > 0)
+float64 max_speed
+---
+bool success
+string message

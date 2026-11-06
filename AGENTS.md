@@ -52,35 +52,30 @@ cells.
 Robotics: probabilistic occupancy grid, loop closure, why `map→odom` is
 separate from `odom→base_link`.
 
-### Phase 4 — Custom interfaces and navigation action server ⬜
+### Phase 4 — Custom interfaces and navigation action server ✅
 Topics: msg, srv, interfaces, actions, services, parameters.
-- New package `my_robot_interfaces` (or `robot_interfaces`) with
-  `action/NavigateToWaypoints.action`:
-  ```
-  # Goal
-  geometry_msgs/PoseStamped[] waypoints
-  float64 max_speed
-  ---
-  # Result
-  bool success
-  float64 total_distance_m
-  string[] visited_waypoints
-  ---
-  # Feedback
-  string current_waypoint
-  float64 distance_remaining
-  uint8 percent_complete
-  ```
-- Action server that iterates over the waypoints calling Nav2 for each one and
-  publishes feedback every second; a command-line action client to test it.
-- Service `/set_speed_limit` that changes the max speed parameter at runtime
-  (via `rcl_interfaces`).
-- Planned package for these nodes: `my_robot_nav` (`waypoint_action_server.py`,
-  `navigation_client.py`).
-Note: the action server depends on Nav2, so parts of Phase 5 may be needed
-first.
+Done: package `robot_interfaces` (ament_cmake) with
+`action/NavigateToWaypoints.action` (goal: `PoseStamped[] waypoints`,
+`float64 max_speed`; result: `success`, `total_distance_m`,
+`visited_waypoints`; feedback: `current_waypoint`, `distance_remaining`,
+`percent_complete`) and `srv/SetSpeedLimit.srv`. Package `robot_navigation`
+(ament_python; plan name was `my_robot_nav`):
+`waypoint_action_server` (action server `/navigate_to_waypoints` that is also
+a client of Nav2's `navigate_to_pose`, one goal per waypoint, feedback every
+1 s, cancel forwarded to Nav2, MultiThreadedExecutor + ReentrantCallbackGroup),
+`navigation_client` (CLI, Ctrl+C cancels), service `/set_speed_limit` that
+sets the `max_speed` parameter (range-checked via `ParameterDescriptor`,
+returns `rcl_interfaces/SetParametersResult`) and publishes
+`nav2_msgs/SpeedLimit` on `/speed_limit`. Pure math in `waypoint_math.py`
+with pytest unit tests. Pulled forward from Phase 5: minimal
+`config/nav2_params.yaml` (DWB inside RotationShimController, NavFn, costmaps
+on `base_footprint`) and `navigation.launch.py` (slam.launch.py + 4 Nav2
+servers + lifecycle manager + waypoint server).
+Verified headless: 3-waypoint route around box_1 in 35 s, final pose 0.23 m /
+12° from the goal (tolerances 0.25 m / 0.25 rad); speed 0.30 → 0.09 m/s after
+`/set_speed_limit 0.1`; Ctrl+C → CANCELED and the robot stops.
 
-### Phase 5 — Full autonomous navigation with Nav2 ⬜
+### Phase 5 — Full autonomous navigation with Nav2 🟡
 Topics: Nav2, launch (arguments and conditionals), parameters (yaml),
 costmap, lifecycle nodes.
 `config/nav2_params.yaml` (costmap resolution, inflation, DWB max speeds, goal
@@ -89,6 +84,9 @@ tolerances). Main `navigation.launch.py` with args `use_sim_time`,
 Scenarios: mapping (SLAM on, exploring) and navigation on a known map (SLAM off,
 AMCL localizing).
 Robotics: DWA (Dynamic Window Approach) and MPPI.
+Already in place from Phase 4: Nav2 installed, minimal `nav2_params.yaml`
+and `navigation.launch.py` running on top of SLAM (no `slam:=false`/AMCL,
+no RViz Nav2 view, no tuning yet).
 
 ### Phase 6 — Tests and quality ⬜
 Topics: tests (gtest, pytest, launch_testing), rosdep, CI.
@@ -136,6 +134,20 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
   covariances (for example with a small relay node).
 - World materials need `<diffuse>` (not only `<ambient>`): the ogre2 PBR
   renderer uses mostly diffuse, so ambient-only objects render black.
+- Nav2 1.5 (`ros-lyrical-navigation2`): `controller_server` and
+  `behavior_server` publish `TwistStamped` unless
+  `enable_stamped_cmd_vel: false`; the Gazebo bridge only carries `Twist` on
+  `/cmd_vel`, so without it the robot silently never moves.
+- Since Nav2 Kilted, `RotationShimController` takes the primary controller as
+  a namespace (`FollowPath.primary_controller.plugin` + its params under it),
+  not as a plugin-name string. Plain DWB stalls ("Failed to make progress")
+  when the next waypoint is behind the robot; the shim fixes it.
+- Waypoint goals are sent with stamp 0 (latest TF). Stamping with a
+  wall-clock node's time makes Nav2 (sim time) look up TF far in the future.
+- Interrupting a headless `gz sim` launch can leave the `gz-sim-main` server
+  orphaned and still publishing `/clock` and `/tf` in that `GZ_PARTITION`
+  (symptom on the next run: sim time not starting at 0, `TF_OLD_DATA`
+  warnings). Check for leftover `gz-sim-main` processes before relaunching.
 - `colcon test` runs `ament_lint_common` (flake8, pep257, xmllint,
   lint_cmake); keep it at 0 failures.
 

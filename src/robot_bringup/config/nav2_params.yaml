@@ -1,0 +1,232 @@
+# Minimal Nav2 configuration for the mobile robot (Phase 4).
+#
+# Only the servers used by the default NavigateToPose behavior tree run:
+#   bt_navigator     — NavigateToPose action, runs the behavior tree
+#   planner_server   — global path on the global costmap (NavFn / Dijkstra)
+#   controller_server— follows the path on the local costmap (DWB)
+#   behavior_server  — recoveries used by the tree (spin, back up, wait)
+# Localization comes from slam_toolbox (map → odom), odometry from Gazebo
+# (odom → base_footprint). Tuning (inflation, tolerances, MPPI vs DWB, AMCL
+# on a saved map) is Phase 5.
+#
+# Robot: 0.30 m long, ~0.30 m wide (wheels at y = ±0.13) → circumscribed
+# radius ≈ 0.21 m; robot_radius 0.22 leaves a small margin.
+
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    # Only NavigateToPose: our waypoint server sends one pose at a time.
+    navigators: ["navigate_to_pose"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    bt_search_directories:
+      - $(find-pkg-share nav2_bt_navigator)/behavior_trees
+    error_code_name_prefixes:
+      - backup
+      - compute_path
+      - follow_path
+      - nav_to_pose
+      - spin
+      - wait
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 20.0
+    odom_topic: odom
+    # The Gazebo bridge expects geometry_msgs/Twist on /cmd_vel. Nav2 1.5
+    # publishes TwistStamped by default, which the bridge would ignore.
+    enable_stamped_cmd_vel: false
+    # nav2_msgs/SpeedLimit published by waypoint_action_server
+    speed_limit_topic: "/speed_limit"
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    path_handler_plugins: ["PathHandler"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    general_goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      stateful: true
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+    PathHandler:
+      plugin: "nav2_controller::FeasiblePathHandler"
+      prune_distance: 2.0
+
+    # DWB = Dynamic Window Approach: samples (v, ω) pairs reachable within
+    # the acceleration limits, simulates each for sim_time seconds and picks
+    # the trajectory with the lowest weighted critic cost.
+    #
+    # DWB alone is poor at turning in place: when the path starts behind the
+    # robot (e.g. the next waypoint is back where it came from) the pure
+    # rotation samples score badly, the robot barely moves and the progress
+    # checker aborts. The RotationShimController wraps DWB: while the path
+    # heading is more than angular_dist_threshold away it rotates in place,
+    # then hands control to DWB (the primary controller).
+    FollowPath:
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      angular_dist_threshold: 0.785       # 45°: rotate first above this
+      forward_sampling_distance: 0.5      # path point used for the heading
+      rotate_to_heading_angular_vel: 1.0
+      max_angular_accel: 2.0
+      simulate_ahead_time: 1.0            # collision check while rotating
+      rotate_to_goal_heading: true        # also do the final turn in place
+      # Since Nav2 Kilted the primary controller has its own namespace:
+      # FollowPath.primary_controller.plugin + its parameters.
+      primary_controller:
+        plugin: "dwb_core::DWBLocalPlanner"
+        min_vel_x: 0.0          # no driving backwards on its own
+        max_vel_x: 0.5          # upper bound; /speed_limit lowers it at runtime
+        min_vel_y: 0.0          # differential drive: no lateral motion
+        max_vel_y: 0.0
+        max_vel_theta: 1.0
+        min_speed_xy: 0.0
+        max_speed_xy: 0.5
+        min_speed_theta: 0.0
+        acc_lim_x: 1.0
+        acc_lim_y: 0.0
+        acc_lim_theta: 2.0
+        decel_lim_x: -1.0
+        decel_lim_y: 0.0
+        decel_lim_theta: -2.0
+        vx_samples: 20
+        vy_samples: 1
+        vtheta_samples: 20
+        sim_time: 1.7
+        linear_granularity: 0.05
+        angular_granularity: 0.025
+        transform_tolerance: 0.2
+        xy_goal_tolerance: 0.25
+        trans_stopped_velocity: 0.25
+        short_circuit_trajectory_evaluation: true
+        stateful: true
+        critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign",
+                  "PathAlign", "PathDist", "GoalDist"]
+        BaseObstacle.scale: 0.02
+        PathAlign.scale: 32.0
+        PathAlign.forward_point_distance: 0.1
+        GoalAlign.scale: 24.0
+        GoalAlign.forward_point_distance: 0.1
+        PathDist.scale: 32.0
+        GoalDist.scale: 24.0
+        RotateToGoal.scale: 32.0
+        RotateToGoal.slowing_factor: 5.0
+        RotateToGoal.lookahead_time: -1.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_footprint
+      rolling_window: true    # 3x3 m window that moves with the robot
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.22
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: true
+          clearing: true
+          max_obstacle_height: 2.0
+          raytrace_max_range: 3.0
+          obstacle_max_range: 2.5
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.45
+      always_send_full_costmap: true
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      robot_radius: 0.22
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        # slam_toolbox publishes /map as transient local ("latched")
+        map_subscribe_transient_local: true
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: true
+          clearing: true
+          max_obstacle_height: 2.0
+          raytrace_max_range: 3.0
+          obstacle_max_range: 2.5
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.45
+      always_send_full_costmap: true
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      # SLAM maps are partially unknown: allow planning through unknown
+      # cells so goals in unexplored areas are still reachable.
+      allow_unknown: true
+
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    enable_stamped_cmd_vel: false   # same reason as controller_server
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "wait"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 2.0
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    autostart: true
+    # Configured, then activated, in this order (and shut down in reverse)
+    node_names: ["controller_server", "planner_server", "behavior_server",
+                 "bt_navigator"]
+    bond_timeout: 4.0

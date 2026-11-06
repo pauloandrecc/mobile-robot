@@ -13,7 +13,9 @@ with autonomous navigation using Nav2 and SLAM.
 mobile-robot/
 ├── src/
 │   ├── robot_description/   — URDF model (Lidar, IMU, camera), worlds, RViz configs
-│   └── robot_bringup/       — top-level launch files, config, helper nodes
+│   ├── robot_bringup/       — top-level launch files, config, helper nodes
+│   ├── robot_interfaces/    — custom action and service definitions
+│   └── robot_navigation/    — waypoint action server and client (Python)
 ├── maps/                    — saved maps from SLAM sessions
 ├── bags/                    — recorded bags (not versioned)
 └── AGENTS.md                — roadmap, phase status and conventions
@@ -100,6 +102,42 @@ ros2 bag info bags/mapping_<date>
 ros2 launch robot_bringup slam_replay.launch.py bag:=bags/mapping_<date>
 ```
 
+### Navigate through waypoints (Nav2)
+
+Starts Gazebo, slam_toolbox, a minimal Nav2 stack and the waypoint action
+server (`/navigate_to_waypoints`):
+
+```bash
+ros2 launch robot_bringup navigation.launch.py
+```
+
+When the log shows `Managed nodes are active`, send waypoints (`x,y` or
+`x,y,yaw_deg`, map frame — the map origin is where the robot started):
+
+```bash
+ros2 run robot_navigation navigation_client 2.5,0 3.2,2.0,90 0,0,180
+
+# Per-goal speed limit (m/s); use -- before negative coordinates
+ros2 run robot_navigation navigation_client --max-speed 0.15 -- -3,0.5
+```
+
+The client prints the feedback once per second; **Ctrl+C cancels** the goal
+and the robot stops. Change the speed limit while it drives:
+
+```bash
+ros2 service call /set_speed_limit robot_interfaces/srv/SetSpeedLimit "{max_speed: 0.1}"
+# same effect, through the parameter directly
+ros2 param set /waypoint_action_server max_speed 0.1
+```
+
+Or use the action from the CLI:
+
+```bash
+ros2 action send_goal --feedback /navigate_to_waypoints \
+  robot_interfaces/action/NavigateToWaypoints \
+  "{waypoints: [{header: {frame_id: map}, pose: {position: {x: 1.5}, orientation: {w: 1.0}}}]}"
+```
+
 ### Teleoperate with a gamepad
 
 The simulation (and SLAM) launch starts gamepad teleoperation by default
@@ -171,7 +209,7 @@ ros2 run rqt_graph rqt_graph
 - [x] Phase 1 — Robot model (URDF, TF2, RViz)
 - [x] Phase 2 — Gazebo simulation (diff drive, Lidar, IMU, camera, odometry)
 - [x] Phase 3 — SLAM mapping (slam_toolbox, map saving, bag recording)
-- [ ] Phase 4 — Custom interfaces and action server
+- [x] Phase 4 — Custom interfaces and action server
 - [ ] Phase 5 — Full autonomous navigation with Nav2
 - [ ] Phase 6 — Tests
 

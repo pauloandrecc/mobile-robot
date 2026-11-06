@@ -1,0 +1,23 @@
+# Drive the robot through a list of waypoints, one Nav2 goal at a time.
+
+# Goal
+# Poses to visit, in order. Usually in the "map" frame (an empty frame_id
+# is treated as "map" by the server).
+geometry_msgs/PoseStamped[] waypoints
+# Speed limit for this goal in m/s. 0.0 = use the server's max_speed parameter.
+float64 max_speed
+---
+# Result
+bool success
+# Distance actually driven (sum of the robot poses reported by Nav2), in meters
+float64 total_distance_m
+# Names of the waypoints reached ("wp_0", "wp_1", ...)
+string[] visited_waypoints
+---
+# Feedback
+# Name of the waypoint the robot is currently driving to
+string current_waypoint
+# Remaining distance (Nav2 path to the current waypoint + straight lines
+# between the remaining ones), in meters
+float64 distance_remaining
+uint8 percent_complete
