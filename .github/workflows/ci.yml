@@ -1,0 +1,55 @@
+# Build and test the workspace on every push to main and every pull request.
+#
+# Runs inside the official ROS 2 Lyrical image (Ubuntu 26.04), installs only
+# the build and test dependencies declared in the package.xml files, builds
+# with colcon and runs `colcon test`. The Gazebo integration test (CTest
+# label "simulation") is skipped: it needs the whole simulation and Nav2
+# stack and a headless renderer, so it is run locally instead:
+#   colcon test --packages-select robot_bringup --ctest-args -L simulation
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: ros:lyrical-ros-base
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update package indexes
+        run: |
+          apt-get update
+          rosdep update --rosdistro lyrical
+
+      # Every dependency of every type (exec included) must be a valid
+      # rosdep key, even if this job does not install it.
+      - name: Check that all dependencies resolve
+        run: rosdep keys --from-paths src --ignore-src | xargs rosdep resolve > /dev/null
+
+      # Only build + test dependencies: if a test imports something that is
+      # not declared as a dependency, the tests below fail.
+      - name: Install build and test dependencies
+        run: >
+          rosdep install --from-paths src --ignore-src -y
+          --dependency-types buildtool --dependency-types build
+          --dependency-types build_export --dependency-types test
+
+      - name: Build
+        run: |
+          source /opt/ros/lyrical/setup.bash
+          colcon build --event-handlers console_cohesion+
+
+      - name: Test
+        run: |
+          source /opt/ros/lyrical/setup.bash
+          colcon test --ctest-args -LE simulation --event-handlers console_cohesion+
+          colcon test-result --verbose

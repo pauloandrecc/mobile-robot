@@ -3,6 +3,7 @@
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
 ![ROS 2](https://img.shields.io/badge/ROS%202-Lyrical-blue)
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+[![CI](https://github.com/pauloandrecc/mobile-robot/actions/workflows/ci.yml/badge.svg)](https://github.com/pauloandrecc/mobile-robot/actions/workflows/ci.yml)
 
 A differential drive mobile robot built with ROS 2, simulated in Gazebo
 with autonomous navigation using Nav2 and SLAM.
@@ -18,6 +19,7 @@ mobile-robot/
 │   └── robot_navigation/    — waypoint action server and client (Python)
 ├── maps/                    — saved maps from SLAM sessions
 ├── bags/                    — recorded bags (not versioned)
+├── .github/workflows/       — CI (build + colcon test)
 └── AGENTS.md                — roadmap, phase status and conventions
 ```
 
@@ -218,6 +220,34 @@ ros2 run tf2_tools view_frames
 ros2 run rqt_graph rqt_graph
 ```
 
+## Tests
+
+```bash
+# Everything except the Gazebo simulation test (what CI runs)
+colcon test --ctest-args -LE simulation
+colcon test-result --verbose
+
+# Only the simulation test: headless Gazebo + SLAM + Nav2, one goal behind
+# box_1, must stop within 0.3 m (Gazebo ground truth) in < 60 s sim time.
+# It fails now and then (lost lifecycle response, see AGENTS.md), so let
+# CTest retry it.
+colcon test --packages-select robot_bringup \
+  --ctest-args -L simulation --repeat until-pass:3
+```
+
+| Package | Test | Checks |
+|---------|------|--------|
+| `robot_navigation` | `test_diff_drive_kinematics.py` | wheel speeds ↔ body twist, odometry integration (exact arc vs Euler) |
+| `robot_navigation` | `test_waypoint_math.py` | quaternions, waypoint parsing, progress, speed limit |
+| `robot_description` | `test_urdf.py` | TF tree, inertias, wheels on the ground, DiffDrive plugin vs URDF geometry |
+| `robot_interfaces` | `test_interfaces.py` | field names/types, defaults, `uint8` bounds, serialization |
+| `robot_bringup` | `test_navigation.launch.py` | `launch_testing` integration test (label `simulation`) |
+| all | `ament_lint_common` | flake8, pep257, xmllint, lint_cmake, copyright |
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) builds and tests
+in the `ros:lyrical-ros-base` container on every push and pull request,
+installing only the build and test dependencies declared in `package.xml`.
+
 ## Phases
 
 - [x] Phase 1 — Robot model (URDF, TF2, RViz)
@@ -225,7 +255,7 @@ ros2 run rqt_graph rqt_graph
 - [x] Phase 3 — SLAM mapping (slam_toolbox, map saving, bag recording)
 - [x] Phase 4 — Custom interfaces and action server
 - [x] Phase 5 — Full autonomous navigation with Nav2 (SLAM or AMCL, DWB or MPPI)
-- [ ] Phase 6 — Tests
+- [x] Phase 6 — Tests (unit, interface, launch_testing integration, CI)
 
 ## License
 

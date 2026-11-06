@@ -18,6 +18,21 @@ if(BUILD_TESTING)
   # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  # Integration test: headless Gazebo + SLAM + Nav2 + waypoint server, one
+  # goal, checked against Gazebo's ground truth. Needs a machine that can
+  # run Gazebo, so it is labeled "simulation":
+  #   colcon test --ctest-args -L simulation    # only this test
+  #   colcon test --ctest-args -LE simulation   # everything else (CI)
+  # The isolated runner gives the test its own ROS_DOMAIN_ID, so it does
+  # not talk to a simulation the user may have open.
+  find_package(launch_testing_ament_cmake REQUIRED)
+  find_package(ament_cmake_ros REQUIRED)
+  add_launch_test(test/test_navigation.launch.py
+    TIMEOUT 300
+    LABELS simulation
+    RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py"
+  )
 endif()
 
 install(DIRECTORY

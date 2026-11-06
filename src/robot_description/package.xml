@@ -22,6 +22,12 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <!-- Also an exec_depend; listed again because test_urdf.py imports it
+       and CI installs only build and test dependencies. -->
+  <test_depend>xacro</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

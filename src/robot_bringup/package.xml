@@ -52,6 +52,17 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <!-- Integration test (test/test_navigation.launch.py). It also needs
+       the whole simulation and Nav2 stack, already listed as exec_depend. -->
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>ament_cmake_ros</test_depend>
+  <test_depend>rmw_test_fixture_implementation</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>robot_interfaces</test_depend>
+  <test_depend>action_msgs</test_depend>
+  <test_depend>geometry_msgs</test_depend>
+  <test_depend>std_srvs</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -99,14 +99,31 @@ costmap inflation.
 Not done (optional): `robot_localization` EKF fusing odom + IMU,
 velocity_smoother / collision_monitor, keepout or speed filter zones.
 
-### Phase 6 — Tests and quality ⬜
+### Phase 6 — Tests and quality ✅
 Topics: tests (gtest, pytest, launch_testing), rosdep, CI.
-- Unit tests (gtest/pytest) for isolated math, e.g. odometry computation.
-- Integration test with `launch_testing`: start Gazebo, send a navigation goal,
-  check the robot arrives within 0.3 m in under 60 s.
-- Interface tests checking the custom messages' fields.
-- All test dependencies declared in `package.xml`; simple CI running
-  `colcon test` after the build.
+Done (all pytest; there is no C++ code, so no gtest):
+- Unit: `robot_navigation/diff_drive_kinematics.py` (wheel speeds ↔ twist,
+  exact arc vs Euler odometry integration) + `test_diff_drive_kinematics.py`;
+  `robot_description/test/test_urdf.py` (TF tree single root
+  `base_footprint`, inertia triangle inequality, wheels/caster touching the
+  ground, DiffDrive `wheel_separation`/`wheel_radius` = URDF geometry).
+  Mutation check: plugin separation 0.26 → 0.25 makes it fail.
+- Interfaces: `robot_interfaces/test/test_interfaces.py` (fields/types,
+  defaults, `uint8` bounds with `check_fields=True`, serialization).
+- Integration: `robot_bringup/test/test_navigation.launch.py`
+  (`add_launch_test`, label `simulation`, `run_test_isolated.py` runner for
+  a private ROS_DOMAIN_ID, own `GZ_PARTITION`). Starts
+  `navigation.launch.py slam:=true` headless, waits for
+  `/lifecycle_manager_navigation/is_active`, sends (3.2, 2.0, 90°) behind
+  box_1 via `/navigate_to_waypoints`, checks Gazebo ground truth
+  (`gz model -p`) < 0.3 m and < 60 s sim time; post-shutdown checks the
+  waypoint server exits with 0. Measured: 14.3–14.5 s sim, 0.135–0.153 m,
+  ~40 s wall per run; 1 of 5 runs hit the lost lifecycle response.
+- Test deps declared in each `package.xml`; CI in
+  `.github/workflows/ci.yml` (`ros:lyrical-ros-base` container, rosdep
+  resolves every key, installs only build+test deps, `colcon test
+  --ctest-args -LE simulation`). Verified locally with docker: 99 tests,
+  0 failures.
 
 ### Extra topics suggested for the roadmap
 ros2_control, Nav2 behavior trees, lifecycle nodes, composable nodes,
@@ -159,6 +176,11 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
   orphaned and still publishing `/clock` and `/tf` in that `GZ_PARTITION`
   (symptom on the next run: sim time not starting at 0, `TF_OLD_DATA`
   warnings). Check for leftover `gz-sim-main` processes before relaunching.
+  Cause: ros_gz_sim runs `gz sim` (Ruby wrapper) which forks
+  `gz-sim-main`; on shutdown only the wrapper gets the signal. This
+  happens on every normal launch_testing shutdown too; the launch test
+  kills its own server at exit, found by `GZ_PARTITION` in
+  `/proc/<pid>/environ`.
 - `TimerAction` runs its actions later, after an enclosing `GroupAction`'s
   scope has already been popped. Put the scoped `GroupAction` (and any
   `SetParameter`) *inside* the timer, never around it.
@@ -167,13 +189,23 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
   (`failed to send response to /<node>/change_state (timeout)` in the log):
   the node is configured but `lifecycle_manager` waits forever and Nav2
   never becomes active. Happened in 3 of 12 test launches; relaunching
-  fixes it. Not caused by the config.
+  fixes it. Not caused by the config. Also seen with low load (~1.5) in
+  the launch test, so it looks like a DDS discovery race rather than load;
+  `lifecycle_manager`'s `service_timeout` does not bound the wait for the
+  transition response. The launch test fails after 60 s; rerun it with
+  `--ctest-args --repeat until-pass:3`.
 - When killing test launches, `pkill -f '<pattern>'` also matches (and
   kills) the shell running it; use `'[p]attern'`. SIGINT does not always
   stop every node of a `ros2 launch`; `kill -9` on DDS nodes leaves stale
   Fast DDS shared memory (clean with `fastdds shm clean`).
 - `colcon test` runs `ament_lint_common` (flake8, pep257, xmllint,
   lint_cmake); keep it at 0 failures.
+- Generated Python messages do **not** check field types/ranges by default
+  (since Jazzy): `uint8 = 300` is accepted and serialized as 44. Checks
+  are on with `Msg(check_fields=True)` or `ROS_PYTHON_CHECK_FIELDS=1`.
+- `colcon` global options go before the verb: `colcon --log-base X build
+  --build-base Y --install-base Z` (and `colcon test-result
+  --test-result-base Y`).
 
 ## Verifying changes without a GUI
 
