@@ -12,13 +12,15 @@ This package orchestrates all other packages — simulation, SLAM, and navigatio
 - slam_replay.launch.py     — rebuild a map from a recorded bag, no Gazebo
 - slam_toolbox.launch.py    — starts and activates slam_toolbox (shared)
 - joystick.launch.py        — gamepad teleoperation (composable nodes)
-- navigation.launch.py      — SLAM + minimal Nav2 + waypoint action server
+- navigation.launch.py      — Nav2 on SLAM or on a saved map (AMCL) + waypoint server
 - scripts/
 - bag_tf_filter.py          — forwards only odom→base_footprint from a bag's /tf
 - config/
 - slam_toolbox_params.yaml  — slam_toolbox tuning parameters
 - joystick.yaml             — gamepad button/axis mapping and speeds
-- nav2_params.yaml          — minimal Nav2 config (DWB + rotation shim)
+- nav2_params.yaml          — Nav2 servers, costmaps, AMCL, map_server
+- controller_dwb.yaml       — local controller: DWB inside a rotation shim
+- controller_mppi.yaml      — local controller: MPPI
 
 ## Launch files
 
@@ -126,36 +128,63 @@ slam_toolbox publishes `map→odom`. `/clock` comes from the bag
 
 ### navigation.launch.py
 
-Includes `slam.launch.py` (Gazebo + slam_toolbox), then after 8 s starts the
-Nav2 servers used by the default NavigateToPose behavior tree
+Starts the simulation, a localization source, then (after 8 s) the Nav2
+servers used by the default NavigateToPose behavior tree
 (`controller_server`, `planner_server`, `behavior_server`, `bt_navigator`),
-a `nav2_lifecycle_manager` that configures/activates them, and
-`robot_navigation`'s `waypoint_action_server`.
+a `nav2_lifecycle_manager` that configures/activates them,
+`robot_navigation`'s `waypoint_action_server` and RViz with
+`robot_description/rviz/nav2.rviz`.
+
+Two scenarios:
+
+| Scenario | Command | Who publishes `/map` and `map→odom` |
+|----------|---------|-------------------------------------|
+| Mapping | `slam:=true` (default) | slam_toolbox (map grows while driving) |
+| Known map | `slam:=false` | `map_server` (saved map) + AMCL, managed by `lifecycle_manager_localization` |
 
 ```bash
-ros2 launch robot_bringup navigation.launch.py
+# from the repository root (map:= defaults to ./maps/my_map.yaml)
+ros2 launch robot_bringup navigation.launch.py                   # SLAM
+ros2 launch robot_bringup navigation.launch.py slam:=false       # AMCL
+ros2 launch robot_bringup navigation.launch.py slam:=false controller:=mppi
 ros2 run robot_navigation navigation_client 2.5,0 3.2,2.0,90 0,0,180
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `use_sim_time` | `true` | Use simulation clock |
-| `use_rviz` | `true` | Launch RViz with the SLAM view |
+| `slam` | `true` | `true`: slam_toolbox; `false`: saved map + AMCL |
+| `map` | `./maps/my_map.yaml` | Map loaded when `slam:=false` (relative to the current directory) |
+| `controller` | `dwb` | Local controller: `dwb` or `mppi` (`config/controller_<name>.yaml`) |
+| `use_rviz` | `true` | Launch RViz with the Nav2 view |
 | `use_joystick` | `true` | Start gamepad teleoperation |
 | `world` | `obstacles_world.sdf` | Path to the Gazebo world file |
 | `nav2_params` | `config/nav2_params.yaml` | Nav2 parameters file |
 | `max_speed` | `0.3` | Initial speed limit of the waypoint server (m/s) |
 
-Notes on `nav2_params.yaml`:
+AMCL is seeded at (0, 0, 0): the robot spawns at the world origin, which is
+also the origin of a map saved from a SLAM session started there. If the
+robot starts elsewhere, use RViz's **2D Pose Estimate** tool.
+
+Notes on the configuration:
 
 - `enable_stamped_cmd_vel: false` — Nav2 1.5 publishes `TwistStamped` by
   default, but the Gazebo bridge expects `Twist` on `/cmd_vel`.
-- The controller is DWB wrapped in `RotationShimController`, which turns in
-  place towards the path first (DWB alone stalls when the next waypoint is
-  behind the robot). Since Nav2 Kilted, DWB's parameters live under
-  `FollowPath.primary_controller`.
+- `controller_server` gets two parameter files: `nav2_params.yaml` and
+  `controller_<name>.yaml` (the last file wins), so only the `FollowPath`
+  plugin changes between DWB and MPPI.
+- DWB is wrapped in `RotationShimController`, which turns in place towards
+  the path first (DWB alone stalls when the next waypoint is behind the
+  robot). Since Nav2 Kilted, DWB's parameters live under
+  `FollowPath.primary_controller`. MPPI needs no shim.
 - `speed_limit_topic: /speed_limit` — the waypoint server publishes
-  `nav2_msgs/SpeedLimit` there to cap the controller's speed at runtime.
+  `nav2_msgs/SpeedLimit` there to cap the controller's speed at runtime
+  (works with both controllers).
+- Tuning (measured on the route above, AMCL): inflation 0.6 m /
+  `cost_scaling_factor` 4.0 and goal tolerance 0.15 m / 0.15 rad. Final
+  error went from 0.23 m / 10° (Phase 4 values) to 0.12-0.14 m / 5-7°, in
+  the same time (~37 s DWB, ~35 s MPPI). A 0.8 m inflation made the route
+  take 53 s (wide detours around box_1).
 
 ## SLAM workflow
 

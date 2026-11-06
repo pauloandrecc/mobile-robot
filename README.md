@@ -102,14 +102,28 @@ ros2 bag info bags/mapping_<date>
 ros2 launch robot_bringup slam_replay.launch.py bag:=bags/mapping_<date>
 ```
 
-### Navigate through waypoints (Nav2)
+### Autonomous navigation (Nav2)
 
-Starts Gazebo, slam_toolbox, a minimal Nav2 stack and the waypoint action
-server (`/navigate_to_waypoints`):
+Starts Gazebo, a localization source, Nav2, the waypoint action server
+(`/navigate_to_waypoints`) and RViz with the Nav2 view. Run it from the
+repository root. Two scenarios:
 
 ```bash
+# Mapping: slam_toolbox builds the map while the robot navigates/explores
 ros2 launch robot_bringup navigation.launch.py
+
+# Known map: map_server loads maps/my_map.yaml and AMCL localizes on it
+ros2 launch robot_bringup navigation.launch.py slam:=false
+
+# Other options: another map, MPPI instead of DWB, no RViz
+ros2 launch robot_bringup navigation.launch.py slam:=false \
+  map:=maps/other_map.yaml controller:=mppi use_rviz:=false
 ```
+
+In RViz, **Nav2 Goal** sends the robot to a pose and **2D Pose Estimate**
+corrects AMCL if it is lost (it starts at the origin, where the robot
+spawns). The view shows the global/local costmaps, the global plan, the
+controller's trajectory and, with AMCL, the particle cloud.
 
 When the log shows `Managed nodes are active`, send waypoints (`x,y` or
 `x,y,yaw_deg`, map frame — the map origin is where the robot started):
@@ -210,7 +224,7 @@ ros2 run rqt_graph rqt_graph
 - [x] Phase 2 — Gazebo simulation (diff drive, Lidar, IMU, camera, odometry)
 - [x] Phase 3 — SLAM mapping (slam_toolbox, map saving, bag recording)
 - [x] Phase 4 — Custom interfaces and action server
-- [ ] Phase 5 — Full autonomous navigation with Nav2
+- [x] Phase 5 — Full autonomous navigation with Nav2 (SLAM or AMCL, DWB or MPPI)
 - [ ] Phase 6 — Tests
 
 ## License

@@ -1,13 +1,17 @@
-# Minimal Nav2 configuration for the mobile robot (Phase 4).
+# Nav2 configuration for the mobile robot.
 #
-# Only the servers used by the default NavigateToPose behavior tree run:
+# Servers used by the default NavigateToPose behavior tree:
 #   bt_navigator     — NavigateToPose action, runs the behavior tree
 #   planner_server   — global path on the global costmap (NavFn / Dijkstra)
-#   controller_server— follows the path on the local costmap (DWB)
+#   controller_server— follows the path on the local costmap; the controller
+#                      plugin (DWB or MPPI) is in controller_<name>.yaml
 #   behavior_server  — recoveries used by the tree (spin, back up, wait)
-# Localization comes from slam_toolbox (map → odom), odometry from Gazebo
-# (odom → base_footprint). Tuning (inflation, tolerances, MPPI vs DWB, AMCL
-# on a saved map) is Phase 5.
+#
+# Localization (map → odom), chosen with navigation.launch.py slam:=...
+#   slam:=true  — slam_toolbox builds the map while the robot drives
+#   slam:=false — map_server loads a saved map and AMCL localizes on it
+#                 (amcl, map_server and lifecycle_manager_localization below)
+# Odometry (odom → base_footprint) always comes from Gazebo's DiffDrive.
 #
 # Robot: 0.30 m long, ~0.30 m wide (wheels at y = ±0.13) → circumscribed
 # radius ≈ 0.21 m; robot_radius 0.22 leaves a small margin.
@@ -56,74 +60,22 @@ controller_server:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
       movement_time_allowance: 10.0
+    # Goal reached when the robot is within 0.15 m and ~8.6° of the goal.
+    # Tightened from 0.25 m / 0.25 rad (Phase 4): the robot used to stop as
+    # soon as it entered the 0.25 m circle, ~0.23 m short of the goal. On
+    # the README route the final error went 0.23 m / 10° → 0.12 m / 7° at
+    # no measurable cost in time.
+    # stateful: once xy is reached, only the final rotation is checked.
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       stateful: true
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25
+      xy_goal_tolerance: 0.15
+      yaw_goal_tolerance: 0.15
     PathHandler:
       plugin: "nav2_controller::FeasiblePathHandler"
       prune_distance: 2.0
-
-    # DWB = Dynamic Window Approach: samples (v, ω) pairs reachable within
-    # the acceleration limits, simulates each for sim_time seconds and picks
-    # the trajectory with the lowest weighted critic cost.
-    #
-    # DWB alone is poor at turning in place: when the path starts behind the
-    # robot (e.g. the next waypoint is back where it came from) the pure
-    # rotation samples score badly, the robot barely moves and the progress
-    # checker aborts. The RotationShimController wraps DWB: while the path
-    # heading is more than angular_dist_threshold away it rotates in place,
-    # then hands control to DWB (the primary controller).
-    FollowPath:
-      plugin: "nav2_rotation_shim_controller::RotationShimController"
-      angular_dist_threshold: 0.785       # 45°: rotate first above this
-      forward_sampling_distance: 0.5      # path point used for the heading
-      rotate_to_heading_angular_vel: 1.0
-      max_angular_accel: 2.0
-      simulate_ahead_time: 1.0            # collision check while rotating
-      rotate_to_goal_heading: true        # also do the final turn in place
-      # Since Nav2 Kilted the primary controller has its own namespace:
-      # FollowPath.primary_controller.plugin + its parameters.
-      primary_controller:
-        plugin: "dwb_core::DWBLocalPlanner"
-        min_vel_x: 0.0          # no driving backwards on its own
-        max_vel_x: 0.5          # upper bound; /speed_limit lowers it at runtime
-        min_vel_y: 0.0          # differential drive: no lateral motion
-        max_vel_y: 0.0
-        max_vel_theta: 1.0
-        min_speed_xy: 0.0
-        max_speed_xy: 0.5
-        min_speed_theta: 0.0
-        acc_lim_x: 1.0
-        acc_lim_y: 0.0
-        acc_lim_theta: 2.0
-        decel_lim_x: -1.0
-        decel_lim_y: 0.0
-        decel_lim_theta: -2.0
-        vx_samples: 20
-        vy_samples: 1
-        vtheta_samples: 20
-        sim_time: 1.7
-        linear_granularity: 0.05
-        angular_granularity: 0.025
-        transform_tolerance: 0.2
-        xy_goal_tolerance: 0.25
-        trans_stopped_velocity: 0.25
-        short_circuit_trajectory_evaluation: true
-        stateful: true
-        critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign",
-                  "PathAlign", "PathDist", "GoalDist"]
-        BaseObstacle.scale: 0.02
-        PathAlign.scale: 32.0
-        PathAlign.forward_point_distance: 0.1
-        GoalAlign.scale: 24.0
-        GoalAlign.forward_point_distance: 0.1
-        PathDist.scale: 32.0
-        GoalDist.scale: 24.0
-        RotateToGoal.scale: 32.0
-        RotateToGoal.slowing_factor: 5.0
-        RotateToGoal.lookahead_time: -1.0
+    # FollowPath (the controller plugin itself) is in controller_dwb.yaml or
+    # controller_mppi.yaml, chosen with navigation.launch.py controller:=...
 
 local_costmap:
   local_costmap:
@@ -149,10 +101,19 @@ local_costmap:
           max_obstacle_height: 2.0
           raytrace_max_range: 3.0
           obstacle_max_range: 2.5
+      # Inflation: cells near obstacles get a cost that decays as
+      #   cost = 252 * exp(-cost_scaling_factor * (d - robot_radius))
+      # up to inflation_radius, then drops to 0. With 0.45 m / 3.0 the cost
+      # fell from ~126 to 0 in one step, so paths hugged that edge. 0.6 m /
+      # 4.0 ends in a gentler step (~55) and keeps paths further from
+      # obstacles. Measured on the 3-waypoint README route (DWB + AMCL):
+      #   0.45 m / 3.0 → 39 s     0.6 m / 4.0 → 37 s     0.8 m / 4.0 → 53 s
+      # 0.8 m made wide detours around box_1 and slowed DWB near costly
+      # cells. Narrowest gap in obstacles_world is ~2.6 m (box ↔ wall).
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.45
+        cost_scaling_factor: 4.0
+        inflation_radius: 0.6
       always_send_full_costmap: true
 
 global_costmap:
@@ -168,7 +129,9 @@ global_costmap:
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        # slam_toolbox publishes /map as transient local ("latched")
+        # /map comes from slam_toolbox (slam:=true, grows over time) or
+        # map_server (slam:=false, fixed); both publish it as transient
+        # local ("latched"), so a late subscriber still gets it.
         map_subscribe_transient_local: true
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -181,10 +144,10 @@ global_costmap:
           max_obstacle_height: 2.0
           raytrace_max_range: 3.0
           obstacle_max_range: 2.5
-      inflation_layer:
+      inflation_layer:         # same as local_costmap (see there)
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.45
+        cost_scaling_factor: 4.0
+        inflation_radius: 0.6
       always_send_full_costmap: true
 
 planner_server:
@@ -222,6 +185,83 @@ behavior_server:
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4
     rotational_acc_lim: 2.0
+
+# ── Localization on a saved map (slam:=false) ─────────────────────────
+
+map_server:
+  ros__parameters:
+    # yaml_filename is set by navigation.launch.py (map:=...)
+    frame_id: map
+
+# AMCL = Adaptive Monte Carlo Localization. A particle filter: each particle
+# is a guess of the robot pose in the map. On every motion (update_min_d /
+# update_min_a) particles are moved with the odometry plus noise (alpha1-5),
+# weighted by how well the Lidar scan, seen from that pose, matches the map
+# (likelihood field), and resampled. The weighted mean becomes map → odom,
+# the correction for the drift accumulated by odometry.
+amcl:
+  ros__parameters:
+    global_frame_id: map
+    odom_frame_id: odom
+    base_frame_id: base_footprint
+    scan_topic: scan
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    # Odometry noise model: how much rotation/translation error each motion
+    # adds to the particles. Gazebo odometry is good, 0.2 is conservative.
+    alpha1: 0.2   # rotation noise from rotation
+    alpha2: 0.2   # rotation noise from translation
+    alpha3: 0.2   # translation noise from translation
+    alpha4: 0.2   # translation noise from rotation
+    alpha5: 0.2   # (omni robots only)
+    # Laser model: our Lidar is 360 beams, 0.12-10 m (gazebo.xacro)
+    laser_model_type: "likelihood_field"
+    laser_min_range: 0.12
+    laser_max_range: 10.0
+    max_beams: 60          # beams used per update (of 360), for speed
+    laser_likelihood_max_dist: 2.0
+    sigma_hit: 0.2
+    z_hit: 0.5
+    z_short: 0.05
+    z_max: 0.05
+    z_rand: 0.5
+    lambda_short: 0.1
+    do_beamskip: false
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    # Filter size (KLD sampling adapts between min and max)
+    min_particles: 500
+    max_particles: 2000
+    pf_err: 0.05
+    pf_z: 0.99
+    resample_interval: 1
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    # Update the filter only after moving 0.25 m or turning 0.2 rad
+    update_min_d: 0.25
+    update_min_a: 0.2
+    save_pose_rate: 0.5
+    random_seed: -1
+    # The robot always spawns at the world origin, which is also the origin
+    # of maps saved from a SLAM session started there. Seed the filter at
+    # (0, 0, 0) so no manual "2D Pose Estimate" is needed; override it with
+    # RViz's 2D Pose Estimate tool (/initialpose) if the robot is elsewhere.
+    set_initial_pose: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+
+lifecycle_manager_localization:
+  ros__parameters:
+    autostart: true
+    node_names: ["map_server", "amcl"]
+    bond_timeout: 4.0
+
+# ── Navigation servers lifecycle ──────────────────────────────────────
 
 lifecycle_manager_navigation:
   ros__parameters:

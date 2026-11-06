@@ -1,0 +1,70 @@
+# Local controller: DWB (Dynamic Window Approach) inside a RotationShim.
+#
+# Loaded on top of nav2_params.yaml by navigation.launch.py when
+# controller:=dwb (the default). Only the FollowPath plugin lives here, so
+# switching to controller_mppi.yaml swaps the algorithm and nothing else.
+#
+# DWB = Dynamic Window Approach: every control cycle (20 Hz) it samples
+# (v, ω) pairs reachable within the acceleration limits — the "dynamic
+# window" —, simulates each one for sim_time seconds as a circular arc,
+# scores the arcs with weighted critics (distance to the path, to the goal,
+# to obstacles, ...) and sends the cheapest one to /cmd_vel.
+
+controller_server:
+  ros__parameters:
+    # DWB alone is poor at turning in place: when the path starts behind the
+    # robot (e.g. the next waypoint is back where it came from) the pure
+    # rotation samples score badly, the robot barely moves and the progress
+    # checker aborts. The RotationShimController wraps DWB: while the path
+    # heading is more than angular_dist_threshold away it rotates in place,
+    # then hands control to DWB (the primary controller).
+    FollowPath:
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      angular_dist_threshold: 0.785       # 45°: rotate first above this
+      forward_sampling_distance: 0.5      # path point used for the heading
+      rotate_to_heading_angular_vel: 1.0
+      max_angular_accel: 2.0
+      simulate_ahead_time: 1.0            # collision check while rotating
+      rotate_to_goal_heading: true        # also do the final turn in place
+      # Since Nav2 Kilted the primary controller has its own namespace:
+      # FollowPath.primary_controller.plugin + its parameters.
+      primary_controller:
+        plugin: "dwb_core::DWBLocalPlanner"
+        min_vel_x: 0.0          # no driving backwards on its own
+        max_vel_x: 0.5          # upper bound; /speed_limit lowers it at runtime
+        min_vel_y: 0.0          # differential drive: no lateral motion
+        max_vel_y: 0.0
+        max_vel_theta: 1.0
+        min_speed_xy: 0.0
+        max_speed_xy: 0.5
+        min_speed_theta: 0.0
+        acc_lim_x: 1.0
+        acc_lim_y: 0.0
+        acc_lim_theta: 2.0
+        decel_lim_x: -1.0
+        decel_lim_y: 0.0
+        decel_lim_theta: -2.0
+        # 20 x 20 = 400 candidate arcs per cycle
+        vx_samples: 20
+        vy_samples: 1
+        vtheta_samples: 20
+        sim_time: 1.7           # how far ahead each arc is simulated (s)
+        linear_granularity: 0.05
+        angular_granularity: 0.025
+        transform_tolerance: 0.2
+        xy_goal_tolerance: 0.15   # keep equal to the goal checker
+        trans_stopped_velocity: 0.25
+        short_circuit_trajectory_evaluation: true
+        stateful: true
+        critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign",
+                  "PathAlign", "PathDist", "GoalDist"]
+        BaseObstacle.scale: 0.02
+        PathAlign.scale: 32.0
+        PathAlign.forward_point_distance: 0.1
+        GoalAlign.scale: 24.0
+        GoalAlign.forward_point_distance: 0.1
+        PathDist.scale: 32.0
+        GoalDist.scale: 24.0
+        RotateToGoal.scale: 32.0
+        RotateToGoal.slowing_factor: 5.0
+        RotateToGoal.lookahead_time: -1.0

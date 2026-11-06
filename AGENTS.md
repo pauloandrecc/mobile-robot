@@ -75,18 +75,29 @@ Verified headless: 3-waypoint route around box_1 in 35 s, final pose 0.23 m /
 12° from the goal (tolerances 0.25 m / 0.25 rad); speed 0.30 → 0.09 m/s after
 `/set_speed_limit 0.1`; Ctrl+C → CANCELED and the robot stops.
 
-### Phase 5 — Full autonomous navigation with Nav2 🟡
+### Phase 5 — Full autonomous navigation with Nav2 ✅
 Topics: Nav2, launch (arguments and conditionals), parameters (yaml),
 costmap, lifecycle nodes.
-`config/nav2_params.yaml` (costmap resolution, inflation, DWB max speeds, goal
-tolerances). Main `navigation.launch.py` with args `use_sim_time`,
-`slam:=true/false` (SLAM or saved map + AMCL) and `rviz:=true/false`.
-Scenarios: mapping (SLAM on, exploring) and navigation on a known map (SLAM off,
-AMCL localizing).
-Robotics: DWA (Dynamic Window Approach) and MPPI.
-Already in place from Phase 4: Nav2 installed, minimal `nav2_params.yaml`
-and `navigation.launch.py` running on top of SLAM (no `slam:=false`/AMCL,
-no RViz Nav2 view, no tuning yet).
+Done: `navigation.launch.py` with `use_sim_time`, `slam:=true/false`,
+`map:=` (default `./maps/my_map.yaml`), `controller:=dwb/mppi` and
+`use_rviz` (plan said `rviz:=`; kept `use_rviz` like the other launch
+files). `slam:=true` includes `slam_toolbox.launch.py`; `slam:=false` starts
+`map_server` + `amcl` + `lifecycle_manager_localization` (AMCL seeded at
+0,0,0 = spawn pose = origin of maps saved from there). Controller split out
+of `nav2_params.yaml` into `config/controller_dwb.yaml` (RotationShim + DWB)
+and `config/controller_mppi.yaml`; `controller_server` loads both files,
+last one wins. RViz view `robot_description/rviz/nav2.rviz` (Nav2 panel,
+Nav2 Goal, 2D Pose Estimate, costmaps, plans, MPPI trajectories, AMCL
+particles). Tuning measured on the README route
+(2.5,0 → 3.2,2,90° → 0,0,180°): inflation 0.45 m/k=3 → 0.6 m/k=4 and goal
+tolerance 0.25 → 0.15 (m and rad). Results (ground truth):
+SLAM+DWB 37.5 s, 0.14 m/6°; AMCL+DWB 37 s, 0.12 m/7°; AMCL+MPPI 35 s,
+0.14 m/5°; AMCL vs ground truth ≤ 3.5 cm. Phase 4 values gave 39 s,
+0.23 m/10°; inflation 0.8 m gave 53 s (wide detours around box_1).
+Robotics: DWA (Dynamic Window Approach) and MPPI, AMCL (particle filter),
+costmap inflation.
+Not done (optional): `robot_localization` EKF fusing odom + IMU,
+velocity_smoother / collision_monitor, keepout or speed filter zones.
 
 ### Phase 6 — Tests and quality ⬜
 Topics: tests (gtest, pytest, launch_testing), rosdep, CI.
@@ -148,6 +159,19 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
   orphaned and still publishing `/clock` and `/tf` in that `GZ_PARTITION`
   (symptom on the next run: sim time not starting at 0, `TF_OLD_DATA`
   warnings). Check for leftover `gz-sim-main` processes before relaunching.
+- `TimerAction` runs its actions later, after an enclosing `GroupAction`'s
+  scope has already been popped. Put the scoped `GroupAction` (and any
+  `SetParameter`) *inside* the timer, never around it.
+- Under load (owner's Gazebo GUI + a headless test, load avg ~10), a
+  lifecycle `change_state` response is sometimes lost
+  (`failed to send response to /<node>/change_state (timeout)` in the log):
+  the node is configured but `lifecycle_manager` waits forever and Nav2
+  never becomes active. Happened in 3 of 12 test launches; relaunching
+  fixes it. Not caused by the config.
+- When killing test launches, `pkill -f '<pattern>'` also matches (and
+  kills) the shell running it; use `'[p]attern'`. SIGINT does not always
+  stop every node of a `ros2 launch`; `kill -9` on DDS nodes leaves stale
+  Fast DDS shared memory (clean with `fastdds shm clean`).
 - `colcon test` runs `ament_lint_common` (flake8, pep257, xmllint,
   lint_cmake); keep it at 0 failures.
 
