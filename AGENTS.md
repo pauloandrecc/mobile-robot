@@ -108,6 +108,17 @@ Done (all pytest; there is no C++ code, so no gtest):
   `base_footprint`, inertia triangle inequality, wheels/caster touching the
   ground, DiffDrive `wheel_separation`/`wheel_radius` = URDF geometry).
   Mutation check: plugin separation 0.26 → 0.25 makes it fail.
+- Action server: `robot_navigation/test/test_waypoint_action_server.py`
+  (launch_testing via the pytest plugin, so it counts as 1 pytest item;
+  random ROS_DOMAIN_ID 100-199). Runs the real `waypoint_action_server`;
+  the test node itself serves `navigate_to_pose` (FakeNav2: succeed /
+  abort / reject / hang). 8 cases in ~4 s, also in CI: waypoint order and
+  default frame, total distance, per-goal speed limit then restore,
+  rejections (empty, negative speed, busy), Nav2 abort and reject → ABORTED,
+  cancel forwarded to Nav2 → CANCELED, feedback, `/set_speed_limit`
+  in/out of range. Found a real bug: `get_logger().warn` (removed in
+  Lyrical's rclpy) crashed the server on every rejected goal.
+  Mutation check: not forwarding the cancel fails the cancel test.
 - Interfaces: `robot_interfaces/test/test_interfaces.py` (fields/types,
   defaults, `uint8` bounds with `check_fields=True`, serialization).
 - Integration: `robot_bringup/test/test_navigation.launch.py`
@@ -122,7 +133,7 @@ Done (all pytest; there is no C++ code, so no gtest):
 - Test deps declared in each `package.xml`; CI in
   `.github/workflows/ci.yml` (`ros:lyrical-ros-base` container, rosdep
   resolves every key, installs only build+test deps, `colcon test
-  --ctest-args -LE simulation`). Verified locally with docker: 99 tests,
+  --ctest-args -LE simulation`). Verified locally with docker: 100 tests,
   0 failures.
 
 ### Extra topics suggested for the roadmap
@@ -203,6 +214,15 @@ MCAP/rosbag2 offline analysis with Python, micro-ROS, SROS2,
 - Generated Python messages do **not** check field types/ranges by default
   (since Jazzy): `uint8 = 300` is accepted and serialized as 44. Checks
   are on with `Msg(check_fields=True)` or `ROS_PYTHON_CHECK_FIELDS=1`.
+- rclpy loggers: use `.warning()`; `.warn()` no longer exists in Lyrical
+  (AttributeError at runtime, only on that code path).
+- When a process under a launch test dies early, launch_testing prints
+  its output decoded as ASCII and raises `UnicodeDecodeError` on any
+  non-ASCII log text (e.g. `→`), hiding the real error. Look for the
+  process traceback in the colcon test log instead.
+- Test doubles that block (e.g. an action that waits for cancel) need a
+  time limit and a stop signal at teardown; otherwise a regression makes
+  the test hang instead of fail.
 - `colcon` global options go before the verb: `colcon --log-base X build
   --build-base Y --install-base Z` (and `colcon test-result
   --test-result-base Y`).

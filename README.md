@@ -239,6 +239,7 @@ colcon test --packages-select robot_bringup \
 |---------|------|--------|
 | `robot_navigation` | `test_diff_drive_kinematics.py` | wheel speeds ↔ body twist, odometry integration (exact arc vs Euler) |
 | `robot_navigation` | `test_waypoint_math.py` | quaternions, waypoint parsing, progress, speed limit |
+| `robot_navigation` | `test_waypoint_action_server.py` | `launch_testing` against a fake Nav2 (no Gazebo): waypoint order, rejected goals, Nav2 abort/reject, cancel forwarding, feedback, `/set_speed_limit` |
 | `robot_description` | `test_urdf.py` | TF tree, inertias, wheels on the ground, DiffDrive plugin vs URDF geometry |
 | `robot_interfaces` | `test_interfaces.py` | field names/types, defaults, `uint8` bounds, serialization |
 | `robot_bringup` | `test_navigation.launch.py` | `launch_testing` integration test (label `simulation`) |
