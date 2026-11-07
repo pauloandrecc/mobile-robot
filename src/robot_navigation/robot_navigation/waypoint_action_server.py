@@ -166,18 +166,18 @@ class WaypointActionServer(Node):
     def _on_goal(self, goal_request):
         """Accept or reject a new goal before it starts executing."""
         if not goal_request.waypoints:
-            self.get_logger().warn('Rejected goal: no waypoints')
+            self.get_logger().warning('Rejected goal: no waypoints')
             return GoalResponse.REJECT
         if goal_request.max_speed < 0.0:
-            self.get_logger().warn('Rejected goal: negative max_speed')
+            self.get_logger().warning('Rejected goal: negative max_speed')
             return GoalResponse.REJECT
         if not self._nav_client.server_is_ready():
-            self.get_logger().warn(
+            self.get_logger().warning(
                 'Rejected goal: Nav2 navigate_to_pose is not available')
             return GoalResponse.REJECT
         with self._goal_lock:
             if self._active_goal is not None:
-                self.get_logger().warn(
+                self.get_logger().warning(
                     'Rejected goal: another goal is running')
                 return GoalResponse.REJECT
             self._active_goal = True  # reserved until execute finishes
